@@ -114,3 +114,15 @@ Here are the games "patches" included with this pack (total of 45 games) along w
 * Wild West Guns
 * Wild West Shootout
 * Zombie Panic in Wonderland
+
+
+# VR Lightgun Framework (VRLF) users
+
+If you play these games in VR through the [VR Lightgun Framework](https://store.steampowered.com/app/4711510/),
+use the **[VRLF (VR Lightgun Framework)](VRLF%20%28VR%20Lightgun%20Framework%29/)** folder
+instead of "Accuracy and control mappings".
+
+VRLF drives the Wii pointer from a virtual gamepad stick with DSU motion rather than a mouse,
+so the Sinden/Gun4IR bindings in the main pack do not apply — but the per-game aim calibration
+does. That folder carries the same calibration by the same authors on top of VRLF's bindings.
+Crosshair removal works with either and is unchanged.
