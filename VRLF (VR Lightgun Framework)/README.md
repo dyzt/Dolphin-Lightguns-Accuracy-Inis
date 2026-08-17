@@ -68,6 +68,17 @@ different game ID and simply gets no per-game profile, falling back to your glob
   *"Selected controller profile does not exist"* at boot. They have no calibration to carry,
   so they get nothing here and fall back to your global mapping.
 
+## Which VRLF gun layout these assume
+
+The committed profiles target the **combined** layout — one gun (a Wii Zapper) carrying the
+Wii Remote and Nunchuk together on a single ViGEm pad.
+
+If you run the **split** layout instead — Remote and Nunchuk as two separate VRLF guns, each
+on its own pad — the calibration is identical (it describes the game, not your hardware) but
+the bindings are not: split profiles name their pads explicitly, as
+`` Nunchuk/Buttons/C = `XInput/1/Gamepad:Shoulder L` ``. Regenerate the whole set against your
+own base in one command; see below. You need one layout or the other, never both.
+
 ## Regenerating
 
 Committed output means you do not need Python to use this. If you have your own bindings and
@@ -75,13 +86,24 @@ want the calibration applied to *them*:
 
 ```
 cd "VRLF (VR Lightgun Framework)/tools"
-python build_vrlf_profiles.py --base /path/to/your/profile.ini
+python build_vrlf_profiles.py --base /path/to/your-P1.ini
 python build_vrlf_profiles.py --verify
 ```
 
-`--base` takes a Dolphin Wiimote profile (a `[Profile]` section). The P2 variant is derived
-from it automatically. `--verify` re-reads the emitted tree and checks that no binding
-drifted from your base, that every calibration value matches upstream, and that every
-profile a game INI references actually exists.
+`--base` takes a Dolphin Wiimote profile (a file with a `[Profile]` section). By default
+player 2 is derived from it — the same bindings on the next pad and the next DSU slot.
+
+**If your layout spreads one Wiimote across several pads, pass `--base-p2` as well.** Player 2
+there is not player 1 shifted by one, so deriving it would point half the controls at player
+1's hardware:
+
+```
+python build_vrlf_profiles.py --base your-Split-P1.ini --base-p2 your-Split-P2.ini
+python build_vrlf_profiles.py --base your-Split-P1.ini --base-p2 your-Split-P2.ini --verify
+```
+
+`--verify` re-reads the emitted tree and checks that no binding drifted from your base, that
+every calibration value matches upstream, and that every profile a game INI references
+actually exists.
 
 Run the tests with `python -m unittest discover -p "test_*.py"` from `tools/`.

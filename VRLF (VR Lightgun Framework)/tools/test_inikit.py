@@ -11,6 +11,12 @@ class TestParseFlat(unittest.TestCase):
             {"Device": "XInput/0/Gamepad", "IR/Total Yaw": "19.0"},
         )
 
+    def test_ignores_semicolon_comments_even_when_they_contain_equals(self):
+        # VRLF's own split-layout base documents its pad order in ; comments,
+        # and one of those lines contains an '=' that must not parse as a key.
+        text = "[Profile]\n; gun2 Remote=XInput/0, gun3 Nunchuk=XInput/1\nDevice = XInput/0/Gamepad\n"
+        self.assertEqual(inikit.parse_flat(text), {"Device": "XInput/0/Gamepad"})
+
     def test_keeps_backticked_values_intact(self):
         text = "[Profile]\nButtons/A = `Button A`\n"
         self.assertEqual(inikit.parse_flat(text)["Buttons/A"], "`Button A`")

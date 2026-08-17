@@ -68,13 +68,18 @@ def _read_dir(path, suffix=".ini"):
     return out
 
 
-def generate(pack_root, out_root, base_path):
+def generate(pack_root, out_root, base_path, base_p2_path=None):
     pack_profiles = _read_dir(os.path.join(pack_root, "Config", "Profiles", "Wiimote"))
     game_inis = _read_dir(os.path.join(pack_root, "GameSettings"))
     plan = resolve(pack_profiles, game_inis)
 
     base_p1 = inikit.read_text(base_path)
-    base_p2 = derive_p2.derive_p2(base_p1)
+    # derive_p2 only knows the default layout's pad numbering. A layout that
+    # spreads one Wiimote across several pads (VRLF's split Remote + Nunchuk)
+    # has its own authored P2, so take it verbatim when offered.
+    base_p2 = (
+        inikit.read_text(base_p2_path) if base_p2_path else derive_p2.derive_p2(base_p1)
+    )
 
     profile_dir = os.path.join(out_root, "Config", "Profiles", "Wiimote")
     game_dir = os.path.join(out_root, "GameSettings")
@@ -119,15 +124,20 @@ def main(argv=None):
     parser.add_argument(
         "--base", default=os.path.join(VRLF_ROOT, "base", "VRLF-Dolphin-Base-P1.ini")
     )
+    parser.add_argument(
+        "--base-p2",
+        default=None,
+        help="player 2's base, when your layout's P2 is not P1 on the next pad",
+    )
     parser.add_argument("--verify", action="store_true")
     args = parser.parse_args(argv)
 
     if args.verify:
         import verify
 
-        return verify.verify(args.pack_root, args.out_root, args.base)
+        return verify.verify(args.pack_root, args.out_root, args.base, args.base_p2)
 
-    generate(args.pack_root, args.out_root, args.base)
+    generate(args.pack_root, args.out_root, args.base, args.base_p2)
     return 0
 
 

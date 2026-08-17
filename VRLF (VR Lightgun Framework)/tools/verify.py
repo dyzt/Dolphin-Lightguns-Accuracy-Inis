@@ -54,20 +54,18 @@ def check(pack_profiles, game_inis, out_profiles, out_games, base_p1, base_p2):
     return problems
 
 
-def verify(pack_root, out_root, base_path):
+def verify(pack_root, out_root, base_path, base_p2_path=None):
     pack_profiles = bvp._read_dir(os.path.join(pack_root, "Config", "Profiles", "Wiimote"))
     game_inis = bvp._read_dir(os.path.join(pack_root, "GameSettings"))
     out_profiles = bvp._read_dir(os.path.join(out_root, "Config", "Profiles", "Wiimote"))
     out_games = bvp._read_dir(os.path.join(out_root, "GameSettings"))
     base_p1 = inikit.read_text(base_path)
 
+    base_p2 = (
+        inikit.read_text(base_p2_path) if base_p2_path else derive_p2.derive_p2(base_p1)
+    )
     problems = check(
-        pack_profiles,
-        game_inis,
-        out_profiles,
-        out_games,
-        base_p1,
-        derive_p2.derive_p2(base_p1),
+        pack_profiles, game_inis, out_profiles, out_games, base_p1, base_p2
     )
     for problem in problems:
         print("FAIL %s" % problem)

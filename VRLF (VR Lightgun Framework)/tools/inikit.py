@@ -26,7 +26,7 @@ def parse_flat(text):
     out = {}
     for raw in text.splitlines():
         line = raw.strip()
-        if not line or line.startswith("#") or line.startswith("*"):
+        if not line or line[0] in "#*;":
             continue
         match = _SECTION.match(line)
         if match:
