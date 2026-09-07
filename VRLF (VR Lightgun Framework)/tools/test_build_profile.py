@@ -9,6 +9,7 @@ BASE = (
     "Device = XInput/0/Gamepad\n"
     "Buttons/A = `Button A`\n"
     "IR/Up = `Left Y-`\n"
+    "IR/Hide = `Button B`\n"
     "IR/Total Yaw = 16.\n"
     "IR/Total Pitch = 12.\n"
     "IR/Vertical Offset = 15.\n"
@@ -63,6 +64,14 @@ class TestBuildProfile(unittest.TestCase):
         self.assertEqual(self.keys["Device"], "XInput/0/Gamepad")
         self.assertEqual(self.keys["Buttons/A"], "`Button A`")
         self.assertEqual(self.keys["IR/Up"], "`Left Y-`")
+
+    def test_ir_hide_is_carried_from_the_base(self):
+        # Wii lightgun games reload by pointing OFF screen; VRLF's Dolphin
+        # profile presses pad B for that and Dolphin has to be told B means
+        # Point > Hide. A per-game profile replaces the WiimoteNew.ini section
+        # wholesale, so a base without this line silently disabled every
+        # off-screen reload (HOTD 2&3 Returns two-player, 2026-09-06).
+        self.assertEqual(self.keys["IR/Hide"], "`Button B`")
 
     def test_pack_only_binding_keys_are_never_carried(self):
         self.assertNotIn("Shake/X", self.keys)
