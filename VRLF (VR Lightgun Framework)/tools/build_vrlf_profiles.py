@@ -95,7 +95,11 @@ def generate(pack_root, out_root, base_path, base_p2_path=None):
         )
         inikit.write_text(
             os.path.join(profile_dir, p2_name + ".ini"),
-            build_profile.build_profile(base_p2, pack_text, stem),
+            # The transform is what stops a per-game extra naming DSUClient/0
+            # from surviving into P2 and pointing player 2 at player 1's motion.
+            build_profile.build_profile(
+                base_p2, pack_text, stem, transform=derive_p2.derive_p2
+            ),
         )
 
     for game_id, stem in sorted(plan.games.items()):

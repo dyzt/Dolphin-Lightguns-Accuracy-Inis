@@ -31,12 +31,27 @@ CARRIED = TRIO + EXTENSION_KEYS
 # VRLF drives these two axes from the physical gun's roll, which is why its Wii
 # profile moves the B and Z bindings to Thumb R / Thumb L - LT and RT have to be
 # free for the axis.
+# Tilt is driven straight off the DSU accelerometer VRLF already streams. The
+# accelerometer's X axis IS gravity's projection on the remote's left/right
+# axis, i.e. sin(roll), which is exactly what Tilt wants - and Z gives
+# forward/back tilt for free. Nothing on the pad had a spare analog pair for a
+# second axis, so this covers strictly more than a pad route could.
+#
+# Note this binds a DEVICE input to a motion-SIMULATION group, which is not the
+# usual pairing. Shake and Swing deliberately get no such binding: games read
+# those from the accelerometer values directly, so a simulation binding would
+# add synthetic spikes on top of the real ones (and Swing also feeds
+# GetTransformation, so it would move the camera too). Tilt is the exception
+# only because a pointer game reads reticle ROTATION from the IR dot angle, and
+# nothing in the accelerometer path rotates the emulated camera.
 EXTRAS = {
     "DEADSPACE_P1": {
-        "Tilt/Left": "`Trigger L`",
-        "Tilt/Right": "`Trigger R`",
-        # Full pull = 90 degrees, matching the roll at which VRLF's axis
-        # saturates, so the emulated remote tracks the real gun 1:1.
+        "Tilt/Left": "`DSUClient/0/vrlf-wiimotes:Accel Left`",
+        "Tilt/Right": "`DSUClient/0/vrlf-wiimotes:Accel Right`",
+        "Tilt/Forward": "`DSUClient/0/vrlf-wiimotes:Accel Forward`",
+        "Tilt/Backward": "`DSUClient/0/vrlf-wiimotes:Accel Backward`",
+        # A full 1 g on an axis is 90 degrees of real tilt, so this makes the
+        # extremes 1:1 (sin-compressed in between, which is monotonic and fine).
         "Tilt/Angle": "90.",
     },
 }
@@ -59,16 +74,27 @@ def calibration_of(pack_text):
     return {key: keys[key] for key in CARRIED if key in keys}
 
 
-def build_profile(base_text, pack_text, source_stem):
+def build_profile(base_text, pack_text, source_stem, transform=None):
+    """Compose one profile. `transform` rewrites EXTRAS values for player 2.
+
+    Extras are inserted AFTER derive_p2 has already rewritten the base, so
+    without this an extra naming DSUClient/0 would survive into P2's profile
+    and player 2 would read player 1's motion. Passing derive_p2.derive_p2 here
+    keeps the P1 -> P2 relationship stated in exactly one place.
+    """
     calibration = calibration_of(pack_text)
     if calibration is None:
         raise ValueError("%s has no calibration to carry" % source_stem)
+
+    extras = EXTRAS.get(source_stem, {})
+    if transform is not None:
+        extras = {key: transform(value) for key, value in extras.items()}
 
     # Extras override the base in place where the key already exists, so a base
     # that later grows its own Tilt/Angle cannot end up with two of them and let
     # Dolphin pick.
     overrides = dict(calibration)
-    overrides.update(EXTRAS.get(source_stem, {}))
+    overrides.update(extras)
 
     out, seen = [], set()
     for raw in base_text.splitlines():

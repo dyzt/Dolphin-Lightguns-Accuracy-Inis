@@ -68,31 +68,37 @@ different game ID and simply gets no per-game profile, falling back to your glob
   *"Selected controller profile does not exist"* at boot. They have no calibration to carry,
   so they get nothing here and fall back to your global mapping.
 
-- **Dead Space Extraction also gets controller roll.** Its profile pair is the only one that
+- **Dead Space Extraction also gets controller tilt.** Its profile pair is the only one that
   binds Dolphin's Tilt group, so turning the gun on its side rotates the emulated remote and
   reaches the game's alt fire. See below.
 
-## Controller roll, and why B and Z moved
+## Controller tilt
 
-Dead Space Extraction reads how the remote is *rotated*, not just where it points. Streaming
-that as accelerometer data over DSU does not work: Dolphin feeds the accelerometer and the
-emulated IR camera from different places, and with `IMUIR/Enabled = False` only the
-accelerometer moves. The game then sees a remote whose accelerometer says 90° and whose sensor
-bar is level, loses pointer lock, and hides the crosshair.
+Dead Space Extraction reads how the remote is *rotated*, not just where it points. The
+accelerometer alone does not rotate the on-screen reticle: with `IMUIR/Enabled = False`
+Dolphin's `EmulateIMUCursor` early-outs, so nothing in the accelerometer path rotates the
+emulated IR camera — and a pointer game reads reticle rotation from the IR dot angle.
 
-Dolphin's **Tilt** group is the one input that rotates both together, and it takes analog
-input — so VRLF publishes the gun's roll on the pad's two analog triggers and Tilt turns it
-into real rotation.
+Dolphin's **Tilt** group does rotate it (`m_tilt_state.angle` feeds `GetTransformation()`,
+which the camera and the reported accelerometer both read). Tilt takes analog input, and
+Dolphin lets any control group bind any device input, so Dead Space's profile binds Tilt
+directly to the DSU accelerometer VRLF already streams:
 
-That needed the triggers free, so two digital bindings moved to the pad's unused stick clicks:
+```
+Tilt/Left     = `DSUClient/0/vrlf-wiimotes:Accel Left`
+Tilt/Right    = `DSUClient/0/vrlf-wiimotes:Accel Right`
+Tilt/Forward  = `DSUClient/0/vrlf-wiimotes:Accel Forward`
+Tilt/Backward = `DSUClient/0/vrlf-wiimotes:Accel Backward`
+Tilt/Angle    = 90.
+```
 
-| Button | Was | Now |
-|---|---|---|
-| Wii `B` | `` `Trigger R` `` | `` `Thumb R` `` |
-| Nunchuk `Z` | `` `Trigger L` `` | `` `Thumb L` `` |
+Accelerometer X is gravity's projection on the remote's left/right axis, i.e. `sin(roll)`.
+All four axes are bound, so forward/back tilt rides along with roll. P2's profile gets
+`DSUClient/1/` automatically.
 
-**This is a coupled change.** These profiles and VRLF's Wii profile bindings moved together;
-mixing an old copy of one with a new copy of the other stops fire working.
+**Shake and Swing deliberately get no such binding.** Games read those from the accelerometer
+values directly, so a simulation binding would add synthetic spikes on top of the real ones,
+and Swing would move the emulated camera as well.
 
 Only Dead Space carries the `Tilt/*` lines. That is deliberate — any tilt rotates the emulated
 IR camera, so a game that ignores roll can still have its aim skewed by a canted wrist. To opt

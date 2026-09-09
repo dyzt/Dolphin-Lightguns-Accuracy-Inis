@@ -1,6 +1,7 @@
 import unittest
 
 import build_profile
+import derive_p2
 import inikit
 
 
@@ -102,19 +103,37 @@ class TestPerGameExtras(unittest.TestCase):
         out = build_profile.build_profile(BASE, PACK, "GHOSTSQUAD_P1")
         self.assertNotIn("Tilt/", out)
 
-    def test_dead_space_gets_the_tilt_bindings(self):
+    def test_dead_space_tilt_comes_from_the_accelerometer(self):
+        # All four directions, so forward/back tilt rides along with roll. The
+        # accelerometer already carries every axis; the pad had no free analog
+        # pair left for pitch.
         out = build_profile.build_profile(BASE, PACK, "DEADSPACE_P1")
         keys = inikit.parse_flat(out)
-        self.assertEqual(keys["Tilt/Left"], "`Trigger L`")
-        self.assertEqual(keys["Tilt/Right"], "`Trigger R`")
+        self.assertEqual(keys["Tilt/Left"], "`DSUClient/0/vrlf-wiimotes:Accel Left`")
+        self.assertEqual(keys["Tilt/Right"], "`DSUClient/0/vrlf-wiimotes:Accel Right`")
+        self.assertEqual(keys["Tilt/Forward"], "`DSUClient/0/vrlf-wiimotes:Accel Forward`")
+        self.assertEqual(
+            keys["Tilt/Backward"], "`DSUClient/0/vrlf-wiimotes:Accel Backward`"
+        )
         self.assertEqual(keys["Tilt/Angle"], "90.")
 
-    def test_extras_reach_player_two_as_well(self):
-        # P2 is built from the P2 base with the SAME stem, and Trigger L/R are
-        # device-relative, so they address P2's own pad without rewriting.
-        p2_base = BASE.replace("XInput/0/Gamepad", "XInput/1/Gamepad")
-        out = build_profile.build_profile(p2_base, PACK, "DEADSPACE_P1")
-        self.assertIn("Tilt/Left = `Trigger L`", out)
+    def test_extras_are_transformed_for_player_two(self):
+        # THE trap: derive_p2 rewrites the BASE, and extras are inserted after
+        # it runs. Without the transform every extra would keep DSUClient/0 and
+        # player 2 would read player 1's motion - the same bug that was found
+        # in the hand-written [Wiimote2] block.
+        out = build_profile.build_profile(
+            BASE, PACK, "DEADSPACE_P1", transform=derive_p2.derive_p2
+        )
+        keys = inikit.parse_flat(out)
+        self.assertEqual(keys["Tilt/Left"], "`DSUClient/1/vrlf-wiimotes:Accel Left`")
+        self.assertNotIn("DSUClient/0", out)
+
+    def test_transform_leaves_non_dsu_extras_alone(self):
+        out = build_profile.build_profile(
+            BASE, PACK, "DEADSPACE_P1", transform=derive_p2.derive_p2
+        )
+        self.assertEqual(inikit.parse_flat(out)["Tilt/Angle"], "90.")
 
     def test_extras_do_not_displace_calibration(self):
         out = build_profile.build_profile(BASE, PACK, "DEADSPACE_P1")
