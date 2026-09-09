@@ -44,14 +44,27 @@ CARRIED = TRIO + EXTENSION_KEYS
 # GetTransformation, so it would move the camera too). Tilt is the exception
 # only because a pointer game reads reticle ROTATION from the IR dot angle, and
 # nothing in the accelerometer path rotates the emulated camera.
+# THE SCALE IS LOAD-BEARING. Dolphin's DSU client builds these inputs with
+# `accel_scale = 1.0 / GRAVITY_ACCELERATION` and AccelerometerInput::GetState()
+# returns `value / m_range`, so `Accel Left` reads 9.81 at 1 g, not 1.0. That is
+# right for the IMUAccelerometer group, which wants m/s^2, and wrong for Tilt,
+# which wants a normalised 0..1 stick-like input. Bound raw, the axis saturates
+# at about 6 degrees of real roll and every hand acceleration slams the emulated
+# camera around. Multiplying by 1/9.81 puts 1 g back at 1.0, so a full 90 degree
+# roll is full deflection and the mapping is 1:1 at the extremes.
+ACCEL_TO_UNIT = "0.102"  # 1 / GRAVITY_ACCELERATION
+
 EXTRAS = {
     "DEADSPACE_P1": {
-        "Tilt/Left": "`DSUClient/0/vrlf-wiimotes:Accel Left`",
-        "Tilt/Right": "`DSUClient/0/vrlf-wiimotes:Accel Right`",
-        "Tilt/Forward": "`DSUClient/0/vrlf-wiimotes:Accel Forward`",
-        "Tilt/Backward": "`DSUClient/0/vrlf-wiimotes:Accel Backward`",
-        # A full 1 g on an axis is 90 degrees of real tilt, so this makes the
-        # extremes 1:1 (sin-compressed in between, which is monotonic and fine).
+        "Tilt/Left": "`DSUClient/0/vrlf-wiimotes:Accel Left` * " + ACCEL_TO_UNIT,
+        "Tilt/Right": "`DSUClient/0/vrlf-wiimotes:Accel Right` * " + ACCEL_TO_UNIT,
+        "Tilt/Forward": "`DSUClient/0/vrlf-wiimotes:Accel Forward` * " + ACCEL_TO_UNIT,
+        "Tilt/Backward": "`DSUClient/0/vrlf-wiimotes:Accel Backward` * " + ACCEL_TO_UNIT,
+        # Gravity is what the axis measures, so it only reads a real angle while
+        # the gun is still. A hand acceleration adds to it, and this dead zone is
+        # what stops that jitter reaching the emulated IR camera at rest.
+        "Tilt/Dead Zone": "15.",
+        # Full deflection = 90 degrees, matching the roll that saturates the axis.
         "Tilt/Angle": "90.",
     },
 }
