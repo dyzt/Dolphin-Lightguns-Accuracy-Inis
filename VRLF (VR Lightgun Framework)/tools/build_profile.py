@@ -58,6 +58,22 @@ EXTRAS = {
         "IMUIR/Enabled": "True",
         # Zero, so sweeping the gun cannot add to the stick's horizontal aim.
         "IMUIR/Total Yaw": "0.",
+        # DIAGNOSTIC / candidate fix, 2026-09-09. Dolphin's complementary filter
+        # corrects PITCH AND ROLL from the accelerometer, and its weight is
+        # applied per update rather than scaled by elapsed time, so it has far
+        # more authority than "2%" reads. VRLF's DSU server rotates world-space
+        # linear acceleration into the local frame using the REPORTED
+        # orientation, and a roll-only orientation has yaw pinned to zero - so a
+        # horizontal sweep leaks into that frame's forward/back axis by
+        # sin(yaw offset), Dolphin reads fore/aft acceleration, and corrects
+        # pitch. That is vertical sway whose sign follows the sweep direction.
+        #
+        # Zero removes the only path from hand acceleration to the emulated
+        # camera. Affordable here because the gyro this lane sends is now the
+        # exact derivative of the roll angle it reports, so integration alone
+        # reproduces the roll; what is given up is drift correction over a long
+        # session.
+        "IMUIR/Accelerometer Influence": "0.",
         # No off-screen reload in this game, so Point > Hide is pure cost here.
         # VRLF's aim_zone block presses pad B whenever aim leaves the screen,
         # and every other Wii profile wants that to blank the pointer. Dead

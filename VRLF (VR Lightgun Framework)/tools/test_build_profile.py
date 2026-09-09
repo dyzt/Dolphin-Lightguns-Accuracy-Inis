@@ -148,6 +148,19 @@ class TestPerGameExtras(unittest.TestCase):
         keys = inikit.parse_flat(out)
         self.assertEqual(keys["IR/Total Yaw"], "19.0")
 
+    def test_dead_space_silences_the_accelerometer_correction(self):
+        # Dolphin's complementary filter corrects pitch from the accelerometer,
+        # and this lane's accelerometer carries hand acceleration decomposed in
+        # a yaw-zeroed frame, so a sweep leaks into pitch as vertical sway.
+        out = build_profile.build_profile(BASE, PACK, "DEADSPACE_P1")
+        keys = inikit.parse_flat(out)
+        self.assertEqual(keys["IMUIR/Accelerometer Influence"], "0.")
+
+    def test_accelerometer_correction_is_untouched_elsewhere(self):
+        # Every other game leaves IMUIR off entirely; the setting must not leak.
+        out = build_profile.build_profile(BASE, PACK, "GHOSTSQUAD_P1")
+        self.assertNotIn("Accelerometer Influence", out)
+
     def test_dead_space_unbinds_point_hide(self):
         # It reloads on a shake, not by pointing off screen, so hiding only made
         # the pointer vanish at the screen edge and re-acquire from centre.
