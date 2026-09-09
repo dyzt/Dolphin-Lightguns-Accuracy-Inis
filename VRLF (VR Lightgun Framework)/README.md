@@ -70,7 +70,7 @@ different game ID and simply gets no per-game profile, falling back to your glob
 
 - **Dead Space Extraction also gets controller rotation.** Its profile pair is the only one that
   enables Dolphin's IMU Point path, so turning the gun on its side rotates the emulated remote
-  and reaches the game's alt fire. It is also the only pair with Point > Hide unbound. See below.
+  and reaches the game's alt fire. See below.
 
 ## Controller rotation
 
@@ -106,10 +106,17 @@ Tilt route, that is why it is not here.
 accelerometer values directly, so a simulation binding would add synthetic spikes on top of the
 real ones, and Swing would move the emulated camera as well.
 
-**Point > Hide is unbound for this game only** (`IR/Hide = `). Every other profile uses it for
-the off-screen reload recipe, where VRLF presses pad B as aim leaves the screen. Dead Space
-reloads on a shake instead, so all hiding did there was drop the pointer at the screen edge and
-re-acquire it from centre on the way back in.
+**Point > Hide stays on Button B here too**, exactly as in every other profile: VRLF presses pad B
+as aim leaves the screen and Dolphin blanks the pointer. Dead Space reloads on a shake rather than
+off screen, and the pair had Hide unbound for one build before going straight back, so the whole
+set behaves the same off screen.
+
+**Known issue.** A fast sideways sweep can add a little vertical movement that settles within a
+fraction of a second. That is hand acceleration reaching Dolphin's accelerometer correction
+(`IMUIR/Accelerometer Influence`, left at its default of 2%), and the fix belongs in VRLF's DSU
+server rather than in this file. Do not zero the influence to hide it: Dolphin restarts the IMU
+orientation from identity whenever the gyro input is unbound, so without the correction every gun
+pickup would leave the reticle rotation offset for the rest of the session.
 
 Only Dead Space carries any of this. That is deliberate — any of it rotates the emulated IR
 camera, so a game that ignores roll can still have its aim skewed by a canted wrist. To opt

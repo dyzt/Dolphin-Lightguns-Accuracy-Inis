@@ -100,8 +100,11 @@ class TestPerGameExtras(unittest.TestCase):
     shared base into all 37."""
 
     def test_a_game_without_extras_is_untouched(self):
+        # Every setting in EXTRAS rotates the emulated remote, so none of it may
+        # reach a game that never asked to be rotated.
         out = build_profile.build_profile(BASE, PACK, "GHOSTSQUAD_P1")
         self.assertNotIn("Tilt/", out)
+        self.assertNotIn("IMUIR/", out)
 
     def test_dead_space_uses_the_imu_point_path(self):
         # Not the Tilt group. Dolphin Euler-sums Tilt with the stick pointer, so
@@ -148,36 +151,30 @@ class TestPerGameExtras(unittest.TestCase):
         keys = inikit.parse_flat(out)
         self.assertEqual(keys["IR/Total Yaw"], "19.0")
 
-    def test_dead_space_silences_the_accelerometer_correction(self):
-        # Dolphin's complementary filter corrects pitch from the accelerometer,
-        # and this lane's accelerometer carries hand acceleration decomposed in
-        # a yaw-zeroed frame, so a sweep leaks into pitch as vertical sway.
+    def test_dead_space_keeps_the_accelerometer_correction(self):
+        # Zeroing IMUIR/Accelerometer Influence was tried as a probe for sweep
+        # sway and cannot ship: Dolphin resets the IMU orientation to identity
+        # whenever the gyro is unbound, and VRLF samples a lane only while its
+        # gun is held, so every bind and every holster-and-regrab leaves a roll
+        # offset that only the accelerometer correction removes.
         out = build_profile.build_profile(BASE, PACK, "DEADSPACE_P1")
         keys = inikit.parse_flat(out)
-        self.assertEqual(keys["IMUIR/Accelerometer Influence"], "0.")
+        self.assertNotEqual(keys.get("IMUIR/Accelerometer Influence"), "0.")
 
-    def test_accelerometer_correction_is_untouched_elsewhere(self):
-        # Every other game leaves IMUIR off entirely; the setting must not leak.
-        out = build_profile.build_profile(BASE, PACK, "GHOSTSQUAD_P1")
-        self.assertNotIn("Accelerometer Influence", out)
-
-    def test_dead_space_unbinds_point_hide(self):
-        # It reloads on a shake, not by pointing off screen, so hiding only made
-        # the pointer vanish at the screen edge and re-acquire from centre.
+    def test_dead_space_keeps_point_hide(self):
+        # Every VRLF Wii profile keeps Point > Hide on Button B for the
+        # off-screen recipe, this pair included. It was unbound for one build
+        # on the theory that a shake-reload game has no use for it; a
+        # regression here would leave the reload block pressing a B that
+        # blanks nothing.
         out = build_profile.build_profile(BASE, PACK, "DEADSPACE_P1")
-        self.assertEqual(inikit.parse_flat(out)["IR/Hide"], "")
-
-    def test_unbinding_point_hide_is_scoped_to_dead_space(self):
-        # Every other Wii lightgun game reloads by aiming off screen and would
-        # silently lose reload if this leaked into the base.
-        out = build_profile.build_profile(BASE, PACK, "GHOSTSQUAD_P1")
         self.assertEqual(inikit.parse_flat(out)["IR/Hide"], "`Button B`")
 
-    def test_unbinding_point_hide_survives_the_player_two_transform(self):
+    def test_point_hide_survives_the_player_two_transform(self):
         out = build_profile.build_profile(
             BASE, PACK, "DEADSPACE_P1", transform=derive_p2.derive_p2
         )
-        self.assertEqual(inikit.parse_flat(out)["IR/Hide"], "")
+        self.assertEqual(inikit.parse_flat(out)["IR/Hide"], "`Button B`")
 
     def test_an_extra_overrides_a_base_line_rather_than_duplicating_it(self):
         base = BASE + "IMUIR/Total Yaw = 25.\n"

@@ -20,69 +20,47 @@ CARRIED = TRIO + EXTENSION_KEYS
 # rotated.
 #
 # Dead Space Extraction reads the remote's ROTATION, not just its pointer, for
-# its alt fire. Getting that to Dolphin took three attempts, and the two dead
-# ends are recorded here because both look correct on paper:
+# its alt fire. What works is Dolphin's IMU Point path, fed a roll-only,
+# mirrored orientation from VRLF (`dsu_orientation: {mode: roll_only,
+# invert: true}`). Two routes were built and abandoned first, and both look
+# correct on paper, so they are recorded:
 #
-#   * The raw accelerometer alone cannot do it. With IMUIR disabled,
-#     EmulateIMUCursor early-outs and the IMU never rotates the emulated IR
-#     camera, while GetTotalAcceleration still reports the tilt. The game sees a
-#     remote whose accelerometer says 90 degrees and whose sensor bar is level.
-#   * The Tilt group moves both halves together, but Dolphin sums it with the
-#     stick-driven pointer as EULER ANGLES
-#     (`GetRotationalMatrix(-tilt - swing - cursor)`), so roll re-frames the
-#     pitch axis and aim scrambles the moment the gun is rolled. Measured in the
-#     headset 2026-09-09.
+#   * The raw accelerometer alone never reaches the camera. With IMUIR off,
+#     EmulateIMUCursor early-outs and nothing rotates the emulated IR camera,
+#     so the game sees a tilted accelerometer over a level sensor bar.
+#   * The Tilt group, bound to the DSU accelerometer, rotates the camera but is
+#     composed with the stick-driven pointer as Euler angles, so rolling the
+#     gun scrambled aim. Measured in the headset 2026-09-09.
 #
-# What works is the IMU Point path below. That rotation enters as
-# `extra_rotation * ...`, a real composition, so it cannot disturb the pointer.
+# The full record is VRLF's docs/DECISIONS.md -> "Wii Remote rotation rides the
+# IMU Point path, from a roll-only orientation".
 EXTRAS = {
     "DEADSPACE_P1": {
-        # Rotation comes through the IMU POINT path, not the Tilt group.
-        #
-        # Tilt was tried first and had to be abandoned: Dolphin sums it with the
-        # stick-driven pointer as EULER ANGLES
-        # (`GetRotationalMatrix(-tilt - swing - cursor)`), so roll sits between
-        # yaw and pitch in the resulting product and re-frames the pitch axis.
-        # Aim scrambled as soon as the gun was rolled. Measured in the headset
-        # 2026-09-09.
-        #
-        # The IMU rotation instead enters as `extra_rotation * ...`, a real
-        # composition, so it cannot disturb the pointer. Two consequences that
-        # are handled on the VRLF side, not here:
-        #   * `extra_rotation` is NOT negated where the tilt angle is, so a
-        #     truthful orientation turns the reticle backwards.
-        #   * Total Yaw clamps the IMU's yaw but nothing clamps its pitch, so a
-        #     truthful orientation doubles vertical aim.
-        # VRLF's `dsu_orientation: {mode: roll_only, invert: true}` sends a
-        # mirrored roll-only orientation on this lane, which answers both.
+        # The IMU rotation enters Dolphin's camera transform as
+        # `extra_rotation * ...`, a real composition, so unlike Tilt it cannot
+        # disturb the pointer. Two consequences are handled on the VRLF side,
+        # not here: nothing clamps the IMU's pitch, and the rotation enters
+        # with the opposite sign to Tilt's. That is why VRLF sends a roll-only,
+        # mirrored orientation on this lane.
         "IMUIR/Enabled": "True",
         # Zero, so sweeping the gun cannot add to the stick's horizontal aim.
         "IMUIR/Total Yaw": "0.",
-        # DIAGNOSTIC / candidate fix, 2026-09-09. Dolphin's complementary filter
-        # corrects PITCH AND ROLL from the accelerometer, and its weight is
-        # applied per update rather than scaled by elapsed time, so it has far
-        # more authority than "2%" reads. VRLF's DSU server rotates world-space
-        # linear acceleration into the local frame using the REPORTED
-        # orientation, and a roll-only orientation has yaw pinned to zero - so a
-        # horizontal sweep leaks into that frame's forward/back axis by
-        # sin(yaw offset), Dolphin reads fore/aft acceleration, and corrects
-        # pitch. That is vertical sway whose sign follows the sweep direction.
+        # Deliberately NOT set here, and worth knowing why:
         #
-        # Zero removes the only path from hand acceleration to the emulated
-        # camera. Affordable here because the gyro this lane sends is now the
-        # exact derivative of the roll angle it reports, so integration alone
-        # reproduces the roll; what is given up is drift correction over a long
-        # session.
-        "IMUIR/Accelerometer Influence": "0.",
-        # No off-screen reload in this game, so Point > Hide is pure cost here.
-        # VRLF's aim_zone block presses pad B whenever aim leaves the screen,
-        # and every other Wii profile wants that to blank the pointer. Dead
-        # Space instead reloads on a shake, so all hiding did was drop the
-        # pointer at the screen edge and re-acquire it from centre on the way
-        # back in. Unbound rather than removed: the base still ships the line,
-        # and an empty expression is how Dolphin spells "never true". `Button B`
-        # is bound to nothing else in the base, so nothing else changes.
-        "IR/Hide": "",
+        #   IMUIR/Accelerometer Influence stays at Dolphin's default (2%). It
+        #   was zeroed for one build as a probe for the slight vertical sway a
+        #   fast sideways sweep adds, and zero cannot ship: Dolphin resets the
+        #   IMU orientation to identity whenever the gyro input is unbound, and
+        #   VRLF samples a lane only while its gun is held, so every bind and
+        #   every holster-and-regrab leaves a roll offset that only the
+        #   accelerometer correction ever removes. The sway is hand
+        #   acceleration reaching that correction; the fix for it is in VRLF's
+        #   DSU server, not in this file.
+        #
+        #   IR/Hide stays exactly as the base binds it (Button B), like every
+        #   other profile. It was unbound here for one build on the theory that
+        #   a shake-reload game had no use for it, and went straight back so the
+        #   whole set behaves the same off screen.
     },
 }
 
