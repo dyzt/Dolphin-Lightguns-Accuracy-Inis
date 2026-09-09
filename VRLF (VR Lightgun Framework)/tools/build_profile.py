@@ -56,16 +56,27 @@ ACCEL_TO_UNIT = "0.102"  # 1 / GRAVITY_ACCELERATION
 
 EXTRAS = {
     "DEADSPACE_P1": {
-        "Tilt/Left": "`DSUClient/0/vrlf-wiimotes:Accel Left` * " + ACCEL_TO_UNIT,
-        "Tilt/Right": "`DSUClient/0/vrlf-wiimotes:Accel Right` * " + ACCEL_TO_UNIT,
-        "Tilt/Forward": "`DSUClient/0/vrlf-wiimotes:Accel Forward` * " + ACCEL_TO_UNIT,
-        "Tilt/Backward": "`DSUClient/0/vrlf-wiimotes:Accel Backward` * " + ACCEL_TO_UNIT,
-        # Gravity is what the axis measures, so it only reads a real angle while
-        # the gun is still. A hand acceleration adds to it, and this dead zone is
-        # what stops that jitter reaching the emulated IR camera at rest.
-        "Tilt/Dead Zone": "15.",
-        # Full deflection = 90 degrees, matching the roll that saturates the axis.
-        "Tilt/Angle": "90.",
+        # Rotation comes through the IMU POINT path, not the Tilt group.
+        #
+        # Tilt was tried first and had to be abandoned: Dolphin sums it with the
+        # stick-driven pointer as EULER ANGLES
+        # (`GetRotationalMatrix(-tilt - swing - cursor)`), so roll sits between
+        # yaw and pitch in the resulting product and re-frames the pitch axis.
+        # Aim scrambled as soon as the gun was rolled. Measured in the headset
+        # 2026-09-09.
+        #
+        # The IMU rotation instead enters as `extra_rotation * ...`, a real
+        # composition, so it cannot disturb the pointer. Two consequences that
+        # are handled on the VRLF side, not here:
+        #   * `extra_rotation` is NOT negated where the tilt angle is, so a
+        #     truthful orientation turns the reticle backwards.
+        #   * Total Yaw clamps the IMU's yaw but nothing clamps its pitch, so a
+        #     truthful orientation doubles vertical aim.
+        # VRLF's `dsu_orientation: {mode: roll_only, invert: true}` sends a
+        # mirrored roll-only orientation on this lane, which answers both.
+        "IMUIR/Enabled": "True",
+        # Zero, so sweeping the gun cannot add to the stick's horizontal aim.
+        "IMUIR/Total Yaw": "0.",
     },
 }
 

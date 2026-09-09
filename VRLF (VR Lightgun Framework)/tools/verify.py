@@ -29,12 +29,26 @@ def check(pack_profiles, game_inis, out_profiles, out_games, base_p1, base_p2):
                 problems.append("missing generated profile %s" % name)
                 continue
             keys = inikit.parse_flat(out_profiles[name])
+            # A per-game extra is ALLOWED to differ from the base - that is what
+            # it is for - so check it against the extra's own value instead of
+            # skipping it. Skipping would let a broken extra through silently,
+            # which matters most for the one that flips IMUIR/Enabled.
+            extras = build_profile.EXTRAS.get(stem, {})
+            if player == "P2":
+                extras = {k: derive_p2.derive_p2(v) for k, v in extras.items()}
             for key, value in bases[player].items():
                 if key in build_profile.CARRIED:
                     continue
+                expected = extras.get(key, value)
+                if keys.get(key) != expected:
+                    problems.append(
+                        "%s: binding %s is %r, expected %r"
+                        % (name, key, keys.get(key), expected)
+                    )
+            for key, value in extras.items():
                 if keys.get(key) != value:
                     problems.append(
-                        "%s: binding %s is %r, base says %r"
+                        "%s: per-game extra %s is %r, expected %r"
                         % (name, key, keys.get(key), value)
                     )
             for key, value in calibration.items():

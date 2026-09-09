@@ -103,37 +103,29 @@ class TestPerGameExtras(unittest.TestCase):
         out = build_profile.build_profile(BASE, PACK, "GHOSTSQUAD_P1")
         self.assertNotIn("Tilt/", out)
 
-    def test_dead_space_tilt_comes_from_the_accelerometer(self):
-        # All four directions, so forward/back tilt rides along with roll. The
-        # accelerometer already carries every axis; the pad had no free analog
-        # pair left for pitch.
+    def test_dead_space_uses_the_imu_point_path(self):
+        # Not the Tilt group. Dolphin Euler-sums Tilt with the stick pointer, so
+        # rolling scrambled aim; the IMU rotation is composed by multiplication
+        # and cannot.
         out = build_profile.build_profile(BASE, PACK, "DEADSPACE_P1")
         keys = inikit.parse_flat(out)
-        for axis in ("Left", "Right", "Forward", "Backward"):
-            self.assertIn(
-                "`DSUClient/0/vrlf-wiimotes:Accel %s`" % axis, keys["Tilt/" + axis]
-            )
-        self.assertEqual(keys["Tilt/Angle"], "90.")
+        self.assertEqual(keys["IMUIR/Enabled"], "True")
+        self.assertNotIn("Tilt/", out)
 
-    def test_every_accel_axis_is_scaled_back_to_unit_range(self):
-        # The regression that shipped once: Dolphin's DSU accel inputs are in
-        # m/s^2 (9.81 at 1 g), while Tilt wants 0..1. Bound raw, the axis
-        # saturates at ~6 degrees of roll. An unscaled axis here is a headset
-        # bug that no other test would catch.
+    def test_imu_yaw_is_clamped_to_zero(self):
+        # Otherwise the gun's own yaw adds to the stick's horizontal aim. Pitch
+        # has no equivalent clamp, which is why VRLF sends a roll-only
+        # orientation on this lane instead of relying on config alone.
         out = build_profile.build_profile(BASE, PACK, "DEADSPACE_P1")
-        keys = inikit.parse_flat(out)
-        for axis in ("Left", "Right", "Forward", "Backward"):
-            self.assertIn(
-                "* " + build_profile.ACCEL_TO_UNIT,
-                keys["Tilt/" + axis],
-                "Tilt/%s must scale the accelerometer back to unit range" % axis,
-            )
+        self.assertEqual(inikit.parse_flat(out)["IMUIR/Total Yaw"], "0.")
 
-    def test_tilt_carries_a_dead_zone(self):
-        # Gravity only reads a true angle while the gun is still, so without
-        # this the emulated IR camera jitters on every hand acceleration.
-        out = build_profile.build_profile(BASE, PACK, "DEADSPACE_P1")
-        self.assertEqual(inikit.parse_flat(out)["Tilt/Dead Zone"], "15.")
+    def test_imu_enabled_replaces_the_base_line_rather_than_duplicating_it(self):
+        # The base ships IMUIR/Enabled = False; two of them would let Dolphin
+        # pick.
+        base = BASE + "IMUIR/Enabled = False\n"
+        out = build_profile.build_profile(base, PACK, "DEADSPACE_P1")
+        self.assertEqual(out.count("IMUIR/Enabled"), 1)
+        self.assertEqual(inikit.parse_flat(out)["IMUIR/Enabled"], "True")
 
     def test_extras_are_transformed_for_player_two(self):
         # THE trap: derive_p2 rewrites the BASE, and extras are inserted after
@@ -143,15 +135,13 @@ class TestPerGameExtras(unittest.TestCase):
         out = build_profile.build_profile(
             BASE, PACK, "DEADSPACE_P1", transform=derive_p2.derive_p2
         )
-        keys = inikit.parse_flat(out)
-        self.assertIn("`DSUClient/1/vrlf-wiimotes:Accel Left`", keys["Tilt/Left"])
         self.assertNotIn("DSUClient/0", out)
 
     def test_transform_leaves_non_dsu_extras_alone(self):
         out = build_profile.build_profile(
             BASE, PACK, "DEADSPACE_P1", transform=derive_p2.derive_p2
         )
-        self.assertEqual(inikit.parse_flat(out)["Tilt/Angle"], "90.")
+        self.assertEqual(inikit.parse_flat(out)["IMUIR/Total Yaw"], "0.")
 
     def test_extras_do_not_displace_calibration(self):
         out = build_profile.build_profile(BASE, PACK, "DEADSPACE_P1")
@@ -159,10 +149,10 @@ class TestPerGameExtras(unittest.TestCase):
         self.assertEqual(keys["IR/Total Yaw"], "19.0")
 
     def test_an_extra_overrides_a_base_line_rather_than_duplicating_it(self):
-        base = BASE + "Tilt/Angle = 45.\n"
+        base = BASE + "IMUIR/Total Yaw = 25.\n"
         out = build_profile.build_profile(base, PACK, "DEADSPACE_P1")
-        self.assertEqual(out.count("Tilt/Angle"), 1)
-        self.assertEqual(inikit.parse_flat(out)["Tilt/Angle"], "90.")
+        self.assertEqual(out.count("IMUIR/Total Yaw"), 1)
+        self.assertEqual(inikit.parse_flat(out)["IMUIR/Total Yaw"], "0.")
 
 
 if __name__ == "__main__":
