@@ -1,4 +1,6 @@
+import os
 import unittest
+from unittest import mock
 
 import build_profile
 import derive_p2
@@ -14,6 +16,8 @@ BASE = (
     "IR/Total Yaw = 16.\n"
     "IR/Total Pitch = 12.\n"
     "IR/Vertical Offset = 15.\n"
+    "IMUIR/Enabled = True\n"
+    "IMUIR/Total Yaw = 0.\n"
     "Extension = Nunchuk\n"
 )
 
@@ -30,6 +34,9 @@ PACK = (
 )
 
 PACK_NO_CALIBRATION = "[Profile]\nDevice = DInput/0/Keyboard Mouse\nButtons/A = `Click 1`\n"
+
+BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "base")
+SHIPPED_BASES = ("VRLF-Dolphin-Base-P1.ini", "VRLF-Dolphin-Base-P2.ini")
 
 
 class TestCalibrationOf(unittest.TestCase):
@@ -94,92 +101,119 @@ class TestBuildProfile(unittest.TestCase):
             build_profile.build_profile(BASE, PACK_NO_CALIBRATION, "MDM_P1")
 
 
-class TestPerGameExtras(unittest.TestCase):
-    """Extras exist so a setting that changes how the emulated remote BEHAVES
-    can be scoped to the one game that asks for it, instead of riding the
-    shared base into all 37."""
+class TestShippedBases(unittest.TestCase):
+    """The two templates every generated profile starts from. What they say
+    about the IMU Point path reaches all 70 profiles, which is the point."""
 
-    def test_a_game_without_extras_is_untouched(self):
-        # Every setting in EXTRAS rotates the emulated remote, so none of it may
-        # reach a game that never asked to be rotated.
-        out = build_profile.build_profile(BASE, PACK, "GHOSTSQUAD_P1")
-        self.assertNotIn("Tilt/", out)
-        self.assertNotIn("IMUIR/", out)
+    def _text(self, name):
+        return inikit.read_text(os.path.join(BASE_DIR, name))
 
-    def test_dead_space_uses_the_imu_point_path(self):
-        # Not the Tilt group. Dolphin Euler-sums Tilt with the stick pointer, so
-        # rolling scrambled aim; the IMU rotation is composed by multiplication
-        # and cannot.
-        out = build_profile.build_profile(BASE, PACK, "DEADSPACE_P1")
-        keys = inikit.parse_flat(out)
-        self.assertEqual(keys["IMUIR/Enabled"], "True")
-        self.assertNotIn("Tilt/", out)
+    def test_every_profile_starts_with_the_imu_point_path_enabled(self):
+        # A real Wii Remote reports its roll to every game (the angle between
+        # the two IR dots), so the emulated one does too. Fanned out from a
+        # Dead Space-only extra on 2026-09-09: the IMU rotation is applied in
+        # the camera frame, about the optical axis, exactly as a real remote
+        # rolls, so a canted wrist does not skew a roll-corrected pointer.
+        for name in SHIPPED_BASES:
+            keys = inikit.parse_flat(self._text(name))
+            self.assertEqual(keys.get("IMUIR/Enabled"), "True", name)
 
-    def test_imu_yaw_is_clamped_to_zero(self):
+    def test_imu_yaw_is_clamped_to_zero_in_every_base(self):
         # Otherwise the gun's own yaw adds to the stick's horizontal aim. Pitch
         # has no equivalent clamp, which is why VRLF sends a roll-only
-        # orientation on this lane instead of relying on config alone.
-        out = build_profile.build_profile(BASE, PACK, "DEADSPACE_P1")
-        self.assertEqual(inikit.parse_flat(out)["IMUIR/Total Yaw"], "0.")
+        # orientation on the lane instead of relying on config alone.
+        for name in SHIPPED_BASES:
+            keys = inikit.parse_flat(self._text(name))
+            self.assertEqual(keys.get("IMUIR/Total Yaw"), "0.", name)
 
-    def test_imu_enabled_replaces_the_base_line_rather_than_duplicating_it(self):
-        # The base ships IMUIR/Enabled = False; two of them would let Dolphin
-        # pick.
-        base = BASE + "IMUIR/Enabled = False\n"
-        out = build_profile.build_profile(base, PACK, "DEADSPACE_P1")
-        self.assertEqual(out.count("IMUIR/Enabled"), 1)
-        self.assertEqual(inikit.parse_flat(out)["IMUIR/Enabled"], "True")
+    def test_the_bases_never_bind_tilt(self):
+        # Tilt is Euler-summed with the stick pointer, so rolling scrambles
+        # aim. Tried and abandoned 2026-09-09; the live WiimoteNew.ini kept
+        # the bindings for a while and that is how uncovered games broke.
+        for name in SHIPPED_BASES:
+            self.assertNotIn("Tilt/", self._text(name), name)
+
+    def test_the_bases_keep_the_accelerometer_correction(self):
+        # Zeroing IMUIR/Accelerometer Influence was tried as a probe for sweep
+        # sway and cannot ship: Dolphin resets the IMU orientation to identity
+        # whenever the gyro is unbound, and VRLF samples a lane only while its
+        # gun is held, so every bind and every holster-and-regrab leaves a roll
+        # offset that only the accelerometer correction removes.
+        for name in SHIPPED_BASES:
+            keys = inikit.parse_flat(self._text(name))
+            self.assertNotEqual(keys.get("IMUIR/Accelerometer Influence"), "0.", name)
+
+    def test_the_bases_carry_point_hide(self):
+        for name in SHIPPED_BASES:
+            keys = inikit.parse_flat(self._text(name))
+            self.assertEqual(keys.get("IR/Hide"), "`Button B`", name)
+
+    def test_the_imu_point_path_survives_the_player_two_derivation(self):
+        # derive_p2 rewrites pad and DSU slot numbers; neither IMUIR line names
+        # either, so they must come through untouched.
+        keys = inikit.parse_flat(derive_p2.derive_p2(self._text(SHIPPED_BASES[0])))
+        self.assertEqual(keys["IMUIR/Enabled"], "True")
+        self.assertEqual(keys["IMUIR/Total Yaw"], "0.")
+        self.assertEqual(keys["Device"], "XInput/1/Gamepad")
+
+
+class TestNoPerGameExceptions(unittest.TestCase):
+    """Every game gets the same remote. Dead Space Extraction was the one
+    exception for a day (it reads roll for its alt fire); now the whole set
+    reports roll, because a real remote does."""
+
+    def test_extras_is_empty(self):
+        self.assertEqual(build_profile.EXTRAS, {})
+
+    def test_dead_space_is_built_like_every_other_game(self):
+        ds = build_profile.build_profile(BASE, PACK, "DEADSPACE_P1")
+        gs = build_profile.build_profile(BASE, PACK, "GHOSTSQUAD_P1")
+        self.assertEqual(ds.replace("DEADSPACE_P1", "X"), gs.replace("GHOSTSQUAD_P1", "X"))
+
+
+class TestExtrasMechanism(unittest.TestCase):
+    """EXTRAS is empty and stays available: a setting that should reach ONE
+    game goes here rather than into the base. These pin how an entry behaves
+    when someone adds one, using a synthetic entry."""
+
+    EXTRA = {
+        "IMUIR/Total Yaw": "25.",
+        "Tilt/Forward": "`DSUClient/0/vrlf-wiimotes:Accel Forward`",
+    }
+
+    def _build(self, base=BASE, stem="SOMEGAME_P1", transform=None):
+        with mock.patch.dict(build_profile.EXTRAS, {"SOMEGAME_P1": self.EXTRA}, clear=True):
+            return build_profile.build_profile(base, PACK, stem, transform=transform)
+
+    def test_an_extra_overrides_a_base_line_rather_than_duplicating_it(self):
+        # Two of the same key would let Dolphin pick.
+        out = self._build()
+        self.assertEqual(out.count("IMUIR/Total Yaw"), 1)
+        self.assertEqual(inikit.parse_flat(out)["IMUIR/Total Yaw"], "25.")
+
+    def test_an_extra_the_base_lacks_is_appended(self):
+        keys = inikit.parse_flat(self._build())
+        self.assertEqual(keys["Tilt/Forward"], "`DSUClient/0/vrlf-wiimotes:Accel Forward`")
 
     def test_extras_are_transformed_for_player_two(self):
         # THE trap: derive_p2 rewrites the BASE, and extras are inserted after
         # it runs. Without the transform every extra would keep DSUClient/0 and
         # player 2 would read player 1's motion - the same bug that was found
         # in the hand-written [Wiimote2] block.
-        out = build_profile.build_profile(
-            BASE, PACK, "DEADSPACE_P1", transform=derive_p2.derive_p2
-        )
+        out = self._build(transform=derive_p2.derive_p2)
         self.assertNotIn("DSUClient/0", out)
+        self.assertIn("DSUClient/1", out)
 
     def test_transform_leaves_non_dsu_extras_alone(self):
-        out = build_profile.build_profile(
-            BASE, PACK, "DEADSPACE_P1", transform=derive_p2.derive_p2
-        )
-        self.assertEqual(inikit.parse_flat(out)["IMUIR/Total Yaw"], "0.")
+        out = self._build(transform=derive_p2.derive_p2)
+        self.assertEqual(inikit.parse_flat(out)["IMUIR/Total Yaw"], "25.")
 
     def test_extras_do_not_displace_calibration(self):
-        out = build_profile.build_profile(BASE, PACK, "DEADSPACE_P1")
-        keys = inikit.parse_flat(out)
-        self.assertEqual(keys["IR/Total Yaw"], "19.0")
+        self.assertEqual(inikit.parse_flat(self._build())["IR/Total Yaw"], "19.0")
 
-    def test_dead_space_keeps_the_accelerometer_correction(self):
-        # Zeroing IMUIR/Accelerometer Influence was tried as a probe for sweep
-        # sway and cannot ship: Dolphin resets the IMU orientation to identity
-        # whenever the gyro is unbound, and VRLF samples a lane only while its
-        # gun is held, so every bind and every holster-and-regrab leaves a roll
-        # offset that only the accelerometer correction removes.
-        out = build_profile.build_profile(BASE, PACK, "DEADSPACE_P1")
-        keys = inikit.parse_flat(out)
-        self.assertNotEqual(keys.get("IMUIR/Accelerometer Influence"), "0.")
-
-    def test_dead_space_keeps_point_hide(self):
-        # Every VRLF Wii profile keeps Point > Hide on Button B for the
-        # off-screen recipe, this pair included. It was unbound for one build
-        # on the theory that a shake-reload game has no use for it; a
-        # regression here would leave the reload block pressing a B that
-        # blanks nothing.
-        out = build_profile.build_profile(BASE, PACK, "DEADSPACE_P1")
-        self.assertEqual(inikit.parse_flat(out)["IR/Hide"], "`Button B`")
-
-    def test_point_hide_survives_the_player_two_transform(self):
-        out = build_profile.build_profile(
-            BASE, PACK, "DEADSPACE_P1", transform=derive_p2.derive_p2
-        )
-        self.assertEqual(inikit.parse_flat(out)["IR/Hide"], "`Button B`")
-
-    def test_an_extra_overrides_a_base_line_rather_than_duplicating_it(self):
-        base = BASE + "IMUIR/Total Yaw = 25.\n"
-        out = build_profile.build_profile(base, PACK, "DEADSPACE_P1")
-        self.assertEqual(out.count("IMUIR/Total Yaw"), 1)
+    def test_a_game_without_an_extra_is_untouched(self):
+        out = self._build(stem="OTHERGAME_P1")
+        self.assertNotIn("Tilt/", out)
         self.assertEqual(inikit.parse_flat(out)["IMUIR/Total Yaw"], "0.")
 
 

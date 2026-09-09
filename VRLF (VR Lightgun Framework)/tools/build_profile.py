@@ -14,15 +14,24 @@ CARRIED = TRIO + EXTENSION_KEYS
 
 # Per-game additions on top of the shared base, keyed by upstream stem.
 #
-# Scoped deliberately rather than folded into the base: everything here changes
-# how the emulated remote BEHAVES, not just how it is calibrated, and a setting
-# that rotates the remote must not reach the games that never asked to be
-# rotated.
+# Empty, and kept: a setting that should reach ONE game goes here rather than
+# into the base, and the P2 transform below is what stops such an entry from
+# pointing player 2 at player 1's motion. Tested with a synthetic entry.
 #
-# Dead Space Extraction reads the remote's ROTATION, not just its pointer, for
-# its alt fire. What works is Dolphin's IMU Point path, fed a roll-only,
-# mirrored orientation from VRLF (`dsu_orientation: {mode: roll_only,
-# invert: true}`). Two routes were built and abandoned first, and both look
+# The IMU Point path lived here for one day (2026-09-09), scoped to Dead Space
+# Extraction because it reads the remote's ROTATION for its alt fire, on the
+# theory that a setting which rotates the remote must not reach games that
+# ignore roll. That theory was never tested and is mostly wrong: a real Wii
+# Remote reports its roll to every game as the angle between the two IR dots,
+# Dolphin applies the IMU rotation in the camera frame (about the optical
+# axis, exactly as a wrist twist rolls a real remote), and a game reading the
+# pointer through the SDK gets a roll-corrected position. So `IMUIR/Enabled`
+# and `IMUIR/Total Yaw = 0.` now sit in base/ and reach all 70 profiles; what
+# feeds them is VRLF's roll-only, mirrored orientation (`dsu_orientation:
+# {mode: roll_only, invert: true, linear_gate: 8.0}`), which VRLF applies to
+# every Wii controller and cannot scope per game anyway.
+#
+# Two routes were built and abandoned before the IMU Point path, and both look
 # correct on paper, so they are recorded:
 #
 #   * The raw accelerometer alone never reaches the camera. With IMUIR off,
@@ -32,37 +41,16 @@ CARRIED = TRIO + EXTENSION_KEYS
 #     composed with the stick-driven pointer as Euler angles, so rolling the
 #     gun scrambled aim. Measured in the headset 2026-09-09.
 #
+# And one knob that is not free: IMUIR/Accelerometer Influence stays at
+# Dolphin's default (2%). Zero cannot ship, because Dolphin resets the IMU
+# orientation to identity whenever the gyro input is unbound and VRLF samples
+# a lane only while its gun is held, so every holster-and-regrab would leave a
+# roll offset that only the correction removes. The sway that knob was probed
+# for is answered in VRLF's DSU server (the linear gate) instead.
+#
 # The full record is VRLF's docs/DECISIONS.md -> "Wii Remote rotation rides the
 # IMU Point path, from a roll-only orientation".
-EXTRAS = {
-    "DEADSPACE_P1": {
-        # The IMU rotation enters Dolphin's camera transform as
-        # `extra_rotation * ...`, a real composition, so unlike Tilt it cannot
-        # disturb the pointer. Two consequences are handled on the VRLF side,
-        # not here: nothing clamps the IMU's pitch, and the rotation enters
-        # with the opposite sign to Tilt's. That is why VRLF sends a roll-only,
-        # mirrored orientation on this lane.
-        "IMUIR/Enabled": "True",
-        # Zero, so sweeping the gun cannot add to the stick's horizontal aim.
-        "IMUIR/Total Yaw": "0.",
-        # Deliberately NOT set here, and worth knowing why:
-        #
-        #   IMUIR/Accelerometer Influence stays at Dolphin's default (2%). It
-        #   was zeroed for one build as a probe for the slight vertical sway a
-        #   fast sideways sweep adds, and zero cannot ship: Dolphin resets the
-        #   IMU orientation to identity whenever the gyro input is unbound, and
-        #   VRLF samples a lane only while its gun is held, so every bind and
-        #   every holster-and-regrab leaves a roll offset that only the
-        #   accelerometer correction ever removes. The sway is hand
-        #   acceleration reaching that correction; the fix for it is in VRLF's
-        #   DSU server, not in this file.
-        #
-        #   IR/Hide stays exactly as the base binds it (Button B), like every
-        #   other profile. It was unbound here for one build on the theory that
-        #   a shake-reload game had no use for it, and went straight back so the
-        #   whole set behaves the same off screen.
-    },
-}
+EXTRAS = {}
 
 HEADER = """\
 # Generated for the VR Lightgun Framework (VRLF) - this file is MODIFIED.

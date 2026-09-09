@@ -45,6 +45,11 @@ You also need VRLF's own Dolphin setup — the global `WiimoteNew.ini` mapping p
 servers on `127.0.0.1:26760` and `127.0.0.1:26761`. See the `Dolphin` profile's
 `INSTRUCTIONS.txt` in VRLF.
 
+**This release needs VRLF 0.1.35 or later.** Every profile here enables Dolphin's IMU Point path
+and expects the roll-only orientation that build streams; on an earlier build the pointer takes
+the gun's pitch on top of the stick aim and the reticle rotates the wrong way. Older builds
+should stay on `vrlf-v1.0`.
+
 **USA game IDs only.** The pack was built against USA discs; a PAL or NTSC-J disc has a
 different game ID and simply gets no per-game profile, falling back to your global mapping.
 
@@ -68,18 +73,20 @@ different game ID and simply gets no per-game profile, falling back to your glob
   *"Selected controller profile does not exist"* at boot. They have no calibration to carry,
   so they get nothing here and fall back to your global mapping.
 
-- **Dead Space Extraction also gets controller rotation.** Its profile pair is the only one that
-  enables Dolphin's IMU Point path, so turning the gun on its side rotates the emulated remote
-  and reaches the game's alt fire. See below.
+- **Every profile reports the gun's roll.** All of them enable Dolphin's IMU Point path, so
+  turning the gun on its side rotates the emulated remote exactly as a real one would. Dead
+  Space Extraction reads it for its alt fire. See below.
 
 ## Controller rotation
 
-Dead Space Extraction reads how the remote is *rotated*, not just where it points. The
+A real Wii Remote reports how it is *rotated* as well as where it points: the IR camera sees the
+sensor bar's two dots, and the angle between them is the remote's roll. Dead Space Extraction
+reads it for its alt fire; other games rotate their cursor with it or ignore it. The
 accelerometer alone does not rotate the on-screen reticle: with `IMUIR/Enabled = False`
 Dolphin's `EmulateIMUCursor` early-outs, so nothing in the accelerometer path rotates the
-emulated IR camera — and a pointer game reads reticle rotation from the IR dot angle.
+emulated IR camera.
 
-Dolphin's **IMU Point** path does rotate it, so Dead Space's profile pair enables it:
+Dolphin's **IMU Point** path does rotate it, so every profile here enables it, from the base:
 
 ```
 IMUIR/Enabled   = True
@@ -96,10 +103,18 @@ roll-only orientation:
 "dsu_orientation": { "mode": "roll_only", "invert": true, "linear_gate": 8.0 }
 ```
 
-That field exists from **VRLF 0.1.35**. On an earlier build the lane reports the gun's true
-orientation, so this pair puts the gun's pitch into the camera on top of the stick aim and
-rotates the reticle the wrong way. Until you update, keep Dead Space on the global mapping by
-not installing `GameSettings/RZJE69.ini`.
+That field exists from **VRLF 0.1.35**, which is why this whole release needs that build: on an
+earlier one the lane reports the gun's true orientation, so every pointer takes the gun's pitch
+on top of the stick aim and the reticle rotates the wrong way.
+
+**Why every game, not just Dead Space.** The first build scoped these two keys to Dead Space on
+the theory that a canted wrist would skew aim in a game that ignores roll. That was never tested
+and is mostly wrong: the IMU rotation is applied in the camera frame, about the optical axis,
+which is exactly what a real remote does when the wrist twists, and a game that reads the pointer
+through the SDK gets a roll-corrected position. A game reading the raw dots drifts with a canted
+wrist, and drifts the same way on a real Wii. What the universal setup costs, and a real remote
+does not: Dolphin's accelerometer correction sees a reload shake, so the reticle wobbles briefly
+while you shake. Measured acceptable in the headset on Dead Space before the fan-out.
 
 **Dolphin's Tilt group was tried first and does not work for this.** Tilt is summed with the
 stick-driven pointer as *Euler angles* (`GetRotationalMatrix(-tilt - swing - cursor)`), so roll
@@ -125,9 +140,8 @@ still visible, lower it if reload shakes stop registering. Do not zero the influ
 Dolphin restarts the IMU orientation from identity whenever the gyro input is unbound, so without
 the correction every gun pickup would leave the reticle rotation offset for the rest of the session.
 
-Only Dead Space carries any of this. That is deliberate — any of it rotates the emulated IR
-camera, so a game that ignores roll can still have its aim skewed by a canted wrist. To opt
-another game in, add it to `EXTRAS` in `tools/build_profile.py` and regenerate.
+To scope a setting to one game instead of the whole set, add it to `EXTRAS` in
+`tools/build_profile.py` and regenerate. The mechanism is kept and tested, and empty on purpose.
 
 ## Which VRLF gun layout these assume
 

@@ -31,8 +31,8 @@ def check(pack_profiles, game_inis, out_profiles, out_games, base_p1, base_p2):
             keys = inikit.parse_flat(out_profiles[name])
             # A per-game extra is ALLOWED to differ from the base - that is what
             # it is for - so check it against the extra's own value instead of
-            # skipping it. Skipping would let a broken extra through silently,
-            # which matters most for the one that flips IMUIR/Enabled.
+            # skipping it. Skipping would let a broken extra through silently.
+            # EXTRAS is empty today, so this is the base check for every key.
             extras = build_profile.EXTRAS.get(stem, {})
             if player == "P2":
                 extras = {k: derive_p2.derive_p2(v) for k, v in extras.items()}
