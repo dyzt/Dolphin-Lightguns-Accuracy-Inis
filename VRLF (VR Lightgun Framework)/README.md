@@ -68,40 +68,51 @@ different game ID and simply gets no per-game profile, falling back to your glob
   *"Selected controller profile does not exist"* at boot. They have no calibration to carry,
   so they get nothing here and fall back to your global mapping.
 
-- **Dead Space Extraction also gets controller tilt.** Its profile pair is the only one that
-  binds Dolphin's Tilt group, so turning the gun on its side rotates the emulated remote and
-  reaches the game's alt fire. See below.
+- **Dead Space Extraction also gets controller rotation.** Its profile pair is the only one that
+  enables Dolphin's IMU Point path, so turning the gun on its side rotates the emulated remote
+  and reaches the game's alt fire. It is also the only pair with Point > Hide unbound. See below.
 
-## Controller tilt
+## Controller rotation
 
 Dead Space Extraction reads how the remote is *rotated*, not just where it points. The
 accelerometer alone does not rotate the on-screen reticle: with `IMUIR/Enabled = False`
 Dolphin's `EmulateIMUCursor` early-outs, so nothing in the accelerometer path rotates the
 emulated IR camera — and a pointer game reads reticle rotation from the IR dot angle.
 
-Dolphin's **Tilt** group does rotate it (`m_tilt_state.angle` feeds `GetTransformation()`,
-which the camera and the reported accelerometer both read). Tilt takes analog input, and
-Dolphin lets any control group bind any device input, so Dead Space's profile binds Tilt
-directly to the DSU accelerometer VRLF already streams:
+Dolphin's **IMU Point** path does rotate it, so Dead Space's profile pair enables it:
 
 ```
-Tilt/Left     = `DSUClient/0/vrlf-wiimotes:Accel Left`
-Tilt/Right    = `DSUClient/0/vrlf-wiimotes:Accel Right`
-Tilt/Forward  = `DSUClient/0/vrlf-wiimotes:Accel Forward`
-Tilt/Backward = `DSUClient/0/vrlf-wiimotes:Accel Backward`
-Tilt/Angle    = 90.
+IMUIR/Enabled   = True
+IMUIR/Total Yaw = 0.
 ```
 
-Accelerometer X is gravity's projection on the remote's left/right axis, i.e. `sin(roll)`.
-All four axes are bound, so forward/back tilt rides along with roll. P2's profile gets
-`DSUClient/1/` automatically.
+`Total Yaw` is zeroed so that sweeping the gun cannot add to the horizontal aim the stick is
+already driving. There is no equivalent clamp for pitch, and the rotation also enters Dolphin's
+camera transform un-negated where the Tilt group's angle enters negated. Both are answered on
+the VRLF side rather than here, by a profile field that makes the lane report a mirrored,
+roll-only orientation:
 
-**Shake and Swing deliberately get no such binding.** Games read those from the accelerometer
-values directly, so a simulation binding would add synthetic spikes on top of the real ones,
-and Swing would move the emulated camera as well.
+```json
+"dsu_orientation": { "mode": "roll_only", "invert": true }
+```
 
-Only Dead Space carries the `Tilt/*` lines. That is deliberate — any tilt rotates the emulated
-IR camera, so a game that ignores roll can still have its aim skewed by a canted wrist. To opt
+**Dolphin's Tilt group was tried first and does not work for this.** Tilt is summed with the
+stick-driven pointer as *Euler angles* (`GetRotationalMatrix(-tilt - swing - cursor)`), so roll
+re-frames the pitch axis and aim scrambles the moment the gun is rolled. The IMU rotation is
+composed by multiplication instead and cannot disturb the pointer. If you are tempted by the
+Tilt route, that is why it is not here.
+
+**Shake and Swing deliberately get no simulation binding.** Games read those from the
+accelerometer values directly, so a simulation binding would add synthetic spikes on top of the
+real ones, and Swing would move the emulated camera as well.
+
+**Point > Hide is unbound for this game only** (`IR/Hide = `). Every other profile uses it for
+the off-screen reload recipe, where VRLF presses pad B as aim leaves the screen. Dead Space
+reloads on a shake instead, so all hiding did there was drop the pointer at the screen edge and
+re-acquire it from centre on the way back in.
+
+Only Dead Space carries any of this. That is deliberate — any of it rotates the emulated IR
+camera, so a game that ignores roll can still have its aim skewed by a canted wrist. To opt
 another game in, add it to `EXTRAS` in `tools/build_profile.py` and regenerate.
 
 ## Which VRLF gun layout these assume

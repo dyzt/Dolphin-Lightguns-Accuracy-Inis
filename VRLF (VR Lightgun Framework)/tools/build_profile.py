@@ -19,41 +19,22 @@ CARRIED = TRIO + EXTENSION_KEYS
 # that rotates the remote must not reach the games that never asked to be
 # rotated.
 #
-# Dead Space Extraction reads the remote's ROTATION, not just its pointer. The
-# accelerometer alone cannot deliver that under Dolphin: with IMUIR disabled,
-# EmulateIMUCursor early-outs and the IMU never rotates the emulated IR camera,
-# while GetTotalAcceleration still reports the tilt. The game then sees a remote
-# whose accelerometer says 90 degrees and whose sensor bar is level, loses
-# pointer lock, and hides the crosshair. The Tilt group is the one input that
-# moves both halves together: m_tilt_state.angle feeds GetTransformation, which
-# the IR camera and the accelerometer both read.
+# Dead Space Extraction reads the remote's ROTATION, not just its pointer, for
+# its alt fire. Getting that to Dolphin took three attempts, and the two dead
+# ends are recorded here because both look correct on paper:
 #
-# VRLF drives these two axes from the physical gun's roll, which is why its Wii
-# profile moves the B and Z bindings to Thumb R / Thumb L - LT and RT have to be
-# free for the axis.
-# Tilt is driven straight off the DSU accelerometer VRLF already streams. The
-# accelerometer's X axis IS gravity's projection on the remote's left/right
-# axis, i.e. sin(roll), which is exactly what Tilt wants - and Z gives
-# forward/back tilt for free. Nothing on the pad had a spare analog pair for a
-# second axis, so this covers strictly more than a pad route could.
+#   * The raw accelerometer alone cannot do it. With IMUIR disabled,
+#     EmulateIMUCursor early-outs and the IMU never rotates the emulated IR
+#     camera, while GetTotalAcceleration still reports the tilt. The game sees a
+#     remote whose accelerometer says 90 degrees and whose sensor bar is level.
+#   * The Tilt group moves both halves together, but Dolphin sums it with the
+#     stick-driven pointer as EULER ANGLES
+#     (`GetRotationalMatrix(-tilt - swing - cursor)`), so roll re-frames the
+#     pitch axis and aim scrambles the moment the gun is rolled. Measured in the
+#     headset 2026-09-09.
 #
-# Note this binds a DEVICE input to a motion-SIMULATION group, which is not the
-# usual pairing. Shake and Swing deliberately get no such binding: games read
-# those from the accelerometer values directly, so a simulation binding would
-# add synthetic spikes on top of the real ones (and Swing also feeds
-# GetTransformation, so it would move the camera too). Tilt is the exception
-# only because a pointer game reads reticle ROTATION from the IR dot angle, and
-# nothing in the accelerometer path rotates the emulated camera.
-# THE SCALE IS LOAD-BEARING. Dolphin's DSU client builds these inputs with
-# `accel_scale = 1.0 / GRAVITY_ACCELERATION` and AccelerometerInput::GetState()
-# returns `value / m_range`, so `Accel Left` reads 9.81 at 1 g, not 1.0. That is
-# right for the IMUAccelerometer group, which wants m/s^2, and wrong for Tilt,
-# which wants a normalised 0..1 stick-like input. Bound raw, the axis saturates
-# at about 6 degrees of real roll and every hand acceleration slams the emulated
-# camera around. Multiplying by 1/9.81 puts 1 g back at 1.0, so a full 90 degree
-# roll is full deflection and the mapping is 1:1 at the extremes.
-ACCEL_TO_UNIT = "0.102"  # 1 / GRAVITY_ACCELERATION
-
+# What works is the IMU Point path below. That rotation enters as
+# `extra_rotation * ...`, a real composition, so it cannot disturb the pointer.
 EXTRAS = {
     "DEADSPACE_P1": {
         # Rotation comes through the IMU POINT path, not the Tilt group.
@@ -77,6 +58,15 @@ EXTRAS = {
         "IMUIR/Enabled": "True",
         # Zero, so sweeping the gun cannot add to the stick's horizontal aim.
         "IMUIR/Total Yaw": "0.",
+        # No off-screen reload in this game, so Point > Hide is pure cost here.
+        # VRLF's aim_zone block presses pad B whenever aim leaves the screen,
+        # and every other Wii profile wants that to blank the pointer. Dead
+        # Space instead reloads on a shake, so all hiding did was drop the
+        # pointer at the screen edge and re-acquire it from centre on the way
+        # back in. Unbound rather than removed: the base still ships the line,
+        # and an empty expression is how Dolphin spells "never true". `Button B`
+        # is bound to nothing else in the base, so nothing else changes.
+        "IR/Hide": "",
     },
 }
 

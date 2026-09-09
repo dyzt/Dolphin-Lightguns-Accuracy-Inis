@@ -148,6 +148,24 @@ class TestPerGameExtras(unittest.TestCase):
         keys = inikit.parse_flat(out)
         self.assertEqual(keys["IR/Total Yaw"], "19.0")
 
+    def test_dead_space_unbinds_point_hide(self):
+        # It reloads on a shake, not by pointing off screen, so hiding only made
+        # the pointer vanish at the screen edge and re-acquire from centre.
+        out = build_profile.build_profile(BASE, PACK, "DEADSPACE_P1")
+        self.assertEqual(inikit.parse_flat(out)["IR/Hide"], "")
+
+    def test_unbinding_point_hide_is_scoped_to_dead_space(self):
+        # Every other Wii lightgun game reloads by aiming off screen and would
+        # silently lose reload if this leaked into the base.
+        out = build_profile.build_profile(BASE, PACK, "GHOSTSQUAD_P1")
+        self.assertEqual(inikit.parse_flat(out)["IR/Hide"], "`Button B`")
+
+    def test_unbinding_point_hide_survives_the_player_two_transform(self):
+        out = build_profile.build_profile(
+            BASE, PACK, "DEADSPACE_P1", transform=derive_p2.derive_p2
+        )
+        self.assertEqual(inikit.parse_flat(out)["IR/Hide"], "")
+
     def test_an_extra_overrides_a_base_line_rather_than_duplicating_it(self):
         base = BASE + "IMUIR/Total Yaw = 25.\n"
         out = build_profile.build_profile(base, PACK, "DEADSPACE_P1")
