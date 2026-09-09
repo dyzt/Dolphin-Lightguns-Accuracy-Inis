@@ -42,7 +42,7 @@ the other, not both. `Crosshair removal` from the original pack is unchanged and
 either: copy its `Load` folder across and tick **Graphics → Advanced → Load Custom Textures**.
 
 You also need VRLF's own Dolphin setup — the global `WiimoteNew.ini` mapping plus two DSU
-servers on `127.0.0.1:26760` and `127.0.0.1:26761`. See the `Wii (DSU)` profile's
+servers on `127.0.0.1:26760` and `127.0.0.1:26761`. See the `Dolphin` profile's
 `INSTRUCTIONS.txt` in VRLF.
 
 **USA game IDs only.** The pack was built against USA discs; a PAL or NTSC-J disc has a
@@ -93,8 +93,13 @@ the VRLF side rather than here, by a profile field that makes the lane report a 
 roll-only orientation:
 
 ```json
-"dsu_orientation": { "mode": "roll_only", "invert": true }
+"dsu_orientation": { "mode": "roll_only", "invert": true, "linear_gate": 8.0 }
 ```
+
+That field exists from **VRLF 0.1.35**. On an earlier build the lane reports the gun's true
+orientation, so this pair puts the gun's pitch into the camera on top of the stick aim and
+rotates the reticle the wrong way. Until you update, keep Dead Space on the global mapping by
+not installing `GameSettings/RZJE69.ini`.
 
 **Dolphin's Tilt group was tried first and does not work for this.** Tilt is summed with the
 stick-driven pointer as *Euler angles* (`GetRotationalMatrix(-tilt - swing - cursor)`), so roll
@@ -111,12 +116,14 @@ as aim leaves the screen and Dolphin blanks the pointer. Dead Space reloads on a
 off screen, and the pair had Hide unbound for one build before going straight back, so the whole
 set behaves the same off screen.
 
-**Known issue.** A fast sideways sweep can add a little vertical movement that settles within a
-fraction of a second. That is hand acceleration reaching Dolphin's accelerometer correction
-(`IMUIR/Accelerometer Influence`, left at its default of 2%), and the fix belongs in VRLF's DSU
-server rather than in this file. Do not zero the influence to hide it: Dolphin restarts the IMU
-orientation from identity whenever the gyro input is unbound, so without the correction every gun
-pickup would leave the reticle rotation offset for the rest of the session.
+**Sway on fast moves is answered on the VRLF side.** Hand acceleration reaches Dolphin's
+accelerometer correction (`IMUIR/Accelerometer Influence`, left at its default of 2%) and used to
+add a little vertical movement on a fast sweep. VRLF 0.1.35 expresses that acceleration in the
+gun's own heading and gates it under `linear_gate` (m/s²; the shipped 8 is about 0.8 g), so a
+sweep never reaches the correction while a reload shake still does. Raise the number if sway is
+still visible, lower it if reload shakes stop registering. Do not zero the influence instead:
+Dolphin restarts the IMU orientation from identity whenever the gyro input is unbound, so without
+the correction every gun pickup would leave the reticle rotation offset for the rest of the session.
 
 Only Dead Space carries any of this. That is deliberate — any of it rotates the emulated IR
 camera, so a game that ignores roll can still have its aim skewed by a canted wrist. To opt
