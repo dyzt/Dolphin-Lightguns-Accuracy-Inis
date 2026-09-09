@@ -12,6 +12,35 @@ TRIO = ("IR/Total Yaw", "IR/Total Pitch", "IR/Vertical Offset")
 EXTENSION_KEYS = ("Extension", "Extension/Attach MotionPlus")
 CARRIED = TRIO + EXTENSION_KEYS
 
+# Per-game additions on top of the shared base, keyed by upstream stem.
+#
+# Scoped deliberately rather than folded into the base: everything here changes
+# how the emulated remote BEHAVES, not just how it is calibrated, and a setting
+# that rotates the remote must not reach the games that never asked to be
+# rotated.
+#
+# Dead Space Extraction reads the remote's ROTATION, not just its pointer. The
+# accelerometer alone cannot deliver that under Dolphin: with IMUIR disabled,
+# EmulateIMUCursor early-outs and the IMU never rotates the emulated IR camera,
+# while GetTotalAcceleration still reports the tilt. The game then sees a remote
+# whose accelerometer says 90 degrees and whose sensor bar is level, loses
+# pointer lock, and hides the crosshair. The Tilt group is the one input that
+# moves both halves together: m_tilt_state.angle feeds GetTransformation, which
+# the IR camera and the accelerometer both read.
+#
+# VRLF drives these two axes from the physical gun's roll, which is why its Wii
+# profile moves the B and Z bindings to Thumb R / Thumb L - LT and RT have to be
+# free for the axis.
+EXTRAS = {
+    "DEADSPACE_P1": {
+        "Tilt/Left": "`Trigger L`",
+        "Tilt/Right": "`Trigger R`",
+        # Full pull = 90 degrees, matching the roll at which VRLF's axis
+        # saturates, so the emulated remote tracks the real gun 1:1.
+        "Tilt/Angle": "90.",
+    },
+}
+
 HEADER = """\
 # Generated for the VR Lightgun Framework (VRLF) - this file is MODIFIED.
 # Aim calibration derived from {source}.ini by Prof_gLX, PiperCalls,
@@ -35,16 +64,22 @@ def build_profile(base_text, pack_text, source_stem):
     if calibration is None:
         raise ValueError("%s has no calibration to carry" % source_stem)
 
+    # Extras override the base in place where the key already exists, so a base
+    # that later grows its own Tilt/Angle cannot end up with two of them and let
+    # Dolphin pick.
+    overrides = dict(calibration)
+    overrides.update(EXTRAS.get(source_stem, {}))
+
     out, seen = [], set()
     for raw in base_text.splitlines():
         line = raw.rstrip()
         key = line.partition("=")[0].strip()
-        if key in calibration:
-            out.append("%s = %s" % (key, calibration[key]))
+        if key in overrides:
+            out.append("%s = %s" % (key, overrides[key]))
             seen.add(key)
         else:
             out.append(line)
-    for key, value in calibration.items():
+    for key, value in overrides.items():
         if key not in seen:
             out.append("%s = %s" % (key, value))
 

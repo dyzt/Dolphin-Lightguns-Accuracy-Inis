@@ -68,6 +68,36 @@ different game ID and simply gets no per-game profile, falling back to your glob
   *"Selected controller profile does not exist"* at boot. They have no calibration to carry,
   so they get nothing here and fall back to your global mapping.
 
+- **Dead Space Extraction also gets controller roll.** Its profile pair is the only one that
+  binds Dolphin's Tilt group, so turning the gun on its side rotates the emulated remote and
+  reaches the game's alt fire. See below.
+
+## Controller roll, and why B and Z moved
+
+Dead Space Extraction reads how the remote is *rotated*, not just where it points. Streaming
+that as accelerometer data over DSU does not work: Dolphin feeds the accelerometer and the
+emulated IR camera from different places, and with `IMUIR/Enabled = False` only the
+accelerometer moves. The game then sees a remote whose accelerometer says 90° and whose sensor
+bar is level, loses pointer lock, and hides the crosshair.
+
+Dolphin's **Tilt** group is the one input that rotates both together, and it takes analog
+input — so VRLF publishes the gun's roll on the pad's two analog triggers and Tilt turns it
+into real rotation.
+
+That needed the triggers free, so two digital bindings moved to the pad's unused stick clicks:
+
+| Button | Was | Now |
+|---|---|---|
+| Wii `B` | `` `Trigger R` `` | `` `Thumb R` `` |
+| Nunchuk `Z` | `` `Trigger L` `` | `` `Thumb L` `` |
+
+**This is a coupled change.** These profiles and VRLF's Wii profile bindings moved together;
+mixing an old copy of one with a new copy of the other stops fire working.
+
+Only Dead Space carries the `Tilt/*` lines. That is deliberate — any tilt rotates the emulated
+IR camera, so a game that ignores roll can still have its aim skewed by a canted wrist. To opt
+another game in, add it to `EXTRAS` in `tools/build_profile.py` and regenerate.
+
 ## Which VRLF gun layout these assume
 
 The committed profiles target the **combined** layout — one gun (a Wii Zapper) carrying the

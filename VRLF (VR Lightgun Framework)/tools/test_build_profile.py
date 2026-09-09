@@ -93,5 +93,40 @@ class TestBuildProfile(unittest.TestCase):
             build_profile.build_profile(BASE, PACK_NO_CALIBRATION, "MDM_P1")
 
 
+class TestPerGameExtras(unittest.TestCase):
+    """Extras exist so a setting that changes how the emulated remote BEHAVES
+    can be scoped to the one game that asks for it, instead of riding the
+    shared base into all 37."""
+
+    def test_a_game_without_extras_is_untouched(self):
+        out = build_profile.build_profile(BASE, PACK, "GHOSTSQUAD_P1")
+        self.assertNotIn("Tilt/", out)
+
+    def test_dead_space_gets_the_tilt_bindings(self):
+        out = build_profile.build_profile(BASE, PACK, "DEADSPACE_P1")
+        keys = inikit.parse_flat(out)
+        self.assertEqual(keys["Tilt/Left"], "`Trigger L`")
+        self.assertEqual(keys["Tilt/Right"], "`Trigger R`")
+        self.assertEqual(keys["Tilt/Angle"], "90.")
+
+    def test_extras_reach_player_two_as_well(self):
+        # P2 is built from the P2 base with the SAME stem, and Trigger L/R are
+        # device-relative, so they address P2's own pad without rewriting.
+        p2_base = BASE.replace("XInput/0/Gamepad", "XInput/1/Gamepad")
+        out = build_profile.build_profile(p2_base, PACK, "DEADSPACE_P1")
+        self.assertIn("Tilt/Left = `Trigger L`", out)
+
+    def test_extras_do_not_displace_calibration(self):
+        out = build_profile.build_profile(BASE, PACK, "DEADSPACE_P1")
+        keys = inikit.parse_flat(out)
+        self.assertEqual(keys["IR/Total Yaw"], "19.0")
+
+    def test_an_extra_overrides_a_base_line_rather_than_duplicating_it(self):
+        base = BASE + "Tilt/Angle = 45.\n"
+        out = build_profile.build_profile(base, PACK, "DEADSPACE_P1")
+        self.assertEqual(out.count("Tilt/Angle"), 1)
+        self.assertEqual(inikit.parse_flat(out)["Tilt/Angle"], "90.")
+
+
 if __name__ == "__main__":
     unittest.main()
