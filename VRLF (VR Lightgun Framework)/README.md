@@ -41,9 +41,11 @@ This **replaces** the equivalent files from `Accuracy and control mappings` — 
 the other, not both. `Crosshair removal` from the original pack is unchanged and works with
 either: copy its `Load` folder across and tick **Graphics → Advanced → Load Custom Textures**.
 
-You also need VRLF's own Dolphin setup — the global `WiimoteNew.ini` mapping plus two DSU
-servers on `127.0.0.1:26760` and `127.0.0.1:26761`. See the `Dolphin` profile's
-`INSTRUCTIONS.txt` in VRLF.
+You also need VRLF's own Dolphin setup: the global mapping for each Wii Remote plus two DSU
+servers on `127.0.0.1:26760` and `127.0.0.1:26761`. VRLF's
+[`Dolphin` profile on the Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3788054425)
+ships both presets (`VRLF-Dolphin-Base` for player 1, `VRLF-Dolphin-Base-P2` for player 2)
+and lists the setup steps in its description.
 
 **This release needs VRLF 0.1.35 or later.** Every profile here enables Dolphin's IMU Point path
 and expects the roll-only orientation that build streams; on an earlier build the pointer takes
@@ -100,7 +102,7 @@ the VRLF side rather than here, by a profile field that makes the lane report a 
 roll-only orientation:
 
 ```json
-"dsu_orientation": { "mode": "roll_only", "invert": true, "linear_gate": 8.0 }
+"dsu_orientation": { "mode": "roll_only", "invert": true }
 ```
 
 That field exists from **VRLF 0.1.35**, which is why this whole release needs that build: on an
@@ -134,7 +136,7 @@ set behaves the same off screen.
 **Sway on fast moves is answered on the VRLF side.** Hand acceleration reaches Dolphin's
 accelerometer correction (`IMUIR/Accelerometer Influence`, left at its default of 2%) and used to
 add a little vertical movement on a fast sweep. VRLF 0.1.35 expresses that acceleration in the
-gun's own heading and gates it under `linear_gate` (m/s²; the shipped 8 is about 0.8 g), so a
+gun's own heading and gates it under the same field's `linear_gate` (m/s²), so a
 sweep never reaches the correction while a reload shake still does. Raise the number if sway is
 still visible, lower it if reload shakes stop registering. Do not zero the influence instead:
 Dolphin restarts the IMU orientation from identity whenever the gyro input is unbound, so without
