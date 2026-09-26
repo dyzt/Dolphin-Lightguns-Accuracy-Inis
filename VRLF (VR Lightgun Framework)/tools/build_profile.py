@@ -30,7 +30,11 @@ def carried_value(key, value):
 # Per-game additions on top of the shared base, keyed by upstream stem. The P2
 # transform below stops an entry from pointing player 2 at player 1's motion.
 #
-# Empty. Every game gets the same remote: the pointer rolls through Dolphin's
+# Ghost Squad alone unbinds Point > Hide: its off-screen aiming broke with Hide
+# on (James, 2026-09-26), so VRLF's off-screen press of pad B does nothing
+# there and the pointer rides the stick to the edge instead.
+#
+# Otherwise every game gets the same remote: the pointer rolls through Dolphin's
 # Tilt group, fed the gun's roll on the pad's triggers by VRLF's `tilt_roll`
 # lanes, and the base carries that for all 70. Tilt rolls the emulated camera
 # without touching the stick's aim, and VRLF takes the roll out of the motion
@@ -52,7 +56,9 @@ def carried_value(key, value):
 #
 # The full record is VRLF's docs/DECISIONS.md -> "Pointer roll rides Dolphin's
 # Tilt".
-EXTRAS = {}
+EXTRAS = {
+    "GHOSTSQUAD_P1": {"IR/Hide": ""},
+}
 
 HEADER = """\
 # Generated for the VR Lightgun Framework (VRLF) - this file is MODIFIED.

@@ -124,10 +124,11 @@ accelerometer values directly, so a simulation binding would add synthetic spike
 real ones, and Swing would move the emulated camera as well.
 
 **Point > Hide stays on Button B**: VRLF presses pad B as aim leaves the screen and Dolphin
-blanks the pointer.
+blanks the pointer. Ghost Squad is the one exception, with Hide unbound: its off-screen aiming
+broke with it on.
 
 To scope a setting to one game instead of the whole set, add it to `EXTRAS` in
-`tools/build_profile.py` and regenerate. It is empty: every game gets the same remote.
+`tools/build_profile.py` and regenerate. Ghost Squad's unbound Hide is the only entry.
 
 ## Which VRLF gun layout these assume
 

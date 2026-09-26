@@ -204,8 +204,25 @@ class TestTiltRoll(unittest.TestCase):
             self.assertEqual(keys.get("Buttons/B"), "`Thumb R`", name)
             self.assertEqual(keys.get("Nunchuk/Buttons/Z"), "`Thumb L`", name)
 
-    def test_no_game_is_an_exception(self):
-        self.assertEqual(build_profile.EXTRAS, {})
+    def test_only_ghost_squad_is_an_exception(self):
+        self.assertEqual(list(build_profile.EXTRAS), ["GHOSTSQUAD_P1"])
+
+
+class TestGhostSquadHide(unittest.TestCase):
+    """Ghost Squad alone leaves Point > Hide unbound (James, 2026-09-26: its
+    off-screen aiming broke with Hide on)."""
+
+    def test_ghost_squad_unbinds_hide_for_both_players(self):
+        p1 = build_profile.build_profile(BASE, PACK, "GHOSTSQUAD_P1")
+        p2 = build_profile.build_profile(derive_p2.derive_p2(BASE), PACK, "GHOSTSQUAD_P1",
+                                         transform=derive_p2.derive_p2)
+        for out in (p1, p2):
+            self.assertEqual(out.count("IR/Hide"), 1)
+            self.assertEqual(inikit.parse_flat(out)["IR/Hide"], "")
+
+    def test_every_other_game_keeps_hide(self):
+        out = build_profile.build_profile(BASE, PACK, "HOTD23_P1")
+        self.assertEqual(inikit.parse_flat(out)["IR/Hide"], "`Button B`")
 
 
 class TestExtrasMechanism(unittest.TestCase):
