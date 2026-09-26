@@ -139,17 +139,20 @@ class TestShippedBases(unittest.TestCase):
 
     def test_the_imu_point_path_is_off_in_every_base(self):
         # VRLF's main Dolphin profile reports the gun's TRUE orientation, and
-        # IMU Point on that puts the gun's pitch on top of the stick aim. Only
-        # Dead Space turns it on.
+        # IMU Point on that puts the gun's pitch on top of the stick aim. The
+        # pointer rolls through Tilt instead.
         for name in SHIPPED_BASES:
             keys = inikit.parse_flat(self._text(name))
             self.assertEqual(keys.get("IMUIR/Enabled"), "False", name)
 
-    def test_the_bases_never_bind_tilt(self):
-        # Tilt is Euler-summed with the stick pointer, so rolling scrambles
-        # aim. Tried and abandoned 2026-09-09.
+    def test_tilt_is_never_bound_to_the_accelerometer(self):
+        # Tried 2026-09-09: raw DSU accel saturated Tilt at about 6 degrees and
+        # carried pitch into the pointer. Tilt takes VRLF's trigger roll only.
         for name in SHIPPED_BASES:
-            self.assertNotIn("Tilt/", self._text(name), name)
+            keys = inikit.parse_flat(self._text(name))
+            for key, value in keys.items():
+                if key.startswith("Tilt/"):
+                    self.assertNotIn("DSUClient", value, "%s %s" % (name, key))
 
     def test_the_bases_keep_the_accelerometer_correction(self):
         # Zeroing IMUIR/Accelerometer Influence cannot ship: Dolphin resets the
@@ -166,30 +169,43 @@ class TestShippedBases(unittest.TestCase):
             self.assertEqual(keys.get("IR/Hide"), "`Button B`", name)
 
 
-class TestDeadSpaceRoll(unittest.TestCase):
-    """Dead Space Extraction is the one game on the IMU Point path, paired with
-    VRLF's "Dead Space Extraction (Dolphin)" profile and its roll lock."""
+class TestTiltRoll(unittest.TestCase):
+    """The pointer rolls with the gun through Dolphin's Tilt group, fed the
+    gun's roll on the pad's two triggers by VRLF's `tilt_roll` lanes. Tilt
+    rolls the emulated camera without touching the stick's aim. So B and Z
+    move off the triggers, onto the stick clicks, and no game needs a
+    per-game exception any more."""
 
-    def test_dead_space_enables_the_imu_point_path(self):
-        keys = inikit.parse_flat(build_profile.build_profile(BASE, PACK, "DEADSPACE_P1"))
-        self.assertEqual(keys["IMUIR/Enabled"], "True")
-        self.assertEqual(keys["IMUIR/Total Yaw"], "0.")
+    def _keys(self, name):
+        return inikit.parse_flat(inikit.read_text(os.path.join(BASE_DIR, name)))
 
-    def test_dead_space_player_two_gets_it_too(self):
-        base_p2 = derive_p2.derive_p2(BASE)
-        out = build_profile.build_profile(
-            base_p2, PACK, "DEADSPACE_P1", transform=derive_p2.derive_p2
-        )
-        self.assertEqual(inikit.parse_flat(out)["IMUIR/Enabled"], "True")
+    def test_tilt_takes_the_roll_from_the_triggers(self):
+        for name in SHIPPED_BASES:
+            keys = self._keys(name)
+            self.assertEqual(keys.get("Tilt/Left"), "`Trigger L`", name)
+            self.assertEqual(keys.get("Tilt/Right"), "`Trigger R`", name)
 
-    def test_other_games_stay_off(self):
-        out = build_profile.build_profile(BASE, PACK, "GHOSTSQUAD_P1")
-        keys = inikit.parse_flat(out)
-        self.assertEqual(keys["IMUIR/Enabled"], "False")
-        self.assertNotIn("IMUIR/Total Yaw", keys)
+    def test_tilt_takes_roll_only(self):
+        # Forward/Backward would put the gun's pitch on top of the stick aim.
+        for name in SHIPPED_BASES:
+            keys = self._keys(name)
+            self.assertNotIn("Tilt/Forward", keys, name)
+            self.assertNotIn("Tilt/Backward", keys, name)
 
-    def test_dead_space_is_the_only_extra(self):
-        self.assertEqual(list(build_profile.EXTRAS), ["DEADSPACE_P1"])
+    def test_the_tilt_angle_matches_vrlf(self):
+        # VRLF's tilt_roll max_deg defaults to 90; the two must agree or the
+        # accelerometer gets back a different roll than was taken out.
+        for name in SHIPPED_BASES:
+            self.assertEqual(self._keys(name).get("Tilt/Angle"), "90.", name)
+
+    def test_b_and_z_are_off_the_triggers(self):
+        for name in SHIPPED_BASES:
+            keys = self._keys(name)
+            self.assertEqual(keys.get("Buttons/B"), "`Thumb R`", name)
+            self.assertEqual(keys.get("Nunchuk/Buttons/Z"), "`Thumb L`", name)
+
+    def test_no_game_is_an_exception(self):
+        self.assertEqual(build_profile.EXTRAS, {})
 
 
 class TestExtrasMechanism(unittest.TestCase):

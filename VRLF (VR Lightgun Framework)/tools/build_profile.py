@@ -30,46 +30,29 @@ def carried_value(key, value):
 # Per-game additions on top of the shared base, keyed by upstream stem. The P2
 # transform below stops an entry from pointing player 2 at player 1's motion.
 #
-# Dead Space Extraction reads the remote's ROTATION for its alt fire, through
-# Dolphin's IMU Point path. That path needs VRLF's roll-only
-# orientation (`dsu_orientation: {mode: roll_only}`), which only
-# VRLF's "Dead Space Extraction (Dolphin)" profile sends. Every other game runs
-# on VRLF's "Dolphin" profile, which reports the gun's TRUE orientation so
-# motion games (Wii Sports) read real gravity and real swings. IMU Point on a
-# true orientation breaks aim: nothing clamps its pitch, so the gun's pitch
-# lands on top of the stick aim. So the path is off in base/ and on here only.
+# Empty. Every game gets the same remote: the pointer rolls through Dolphin's
+# Tilt group, fed the gun's roll on the pad's triggers by VRLF's `tilt_roll`
+# lanes, and the base carries that for all 70. Tilt rolls the emulated camera
+# without touching the stick's aim, and VRLF takes the roll out of the motion
+# it reports so Tilt puts it back into the accelerometer exactly once.
 #
-# History: from 2026-09-09 to 2026-09-26 the path sat in base/ for all 70
-# profiles, fed by a roll lock on every VRLF Wii controller. That cost every
-# game truthful gravity, which broke motion titles. Split back out on
-# 2026-09-26.
+# History, because every route here was tried: IMU Point (`IMUIR/Enabled`) sat
+# in the base from 2026-09-09, then on Dead Space alone, fed a roll-only lane
+# that cost every game truthful gravity; with a true lane it doubles vertical
+# aim, since nothing clamps its pitch. Tilt was first rejected on 2026-09-09 as
+# Euler-summed with the pointer, which Dolphin stopped doing in 2020
+# (bd067875e); what scrambled aim then was VRLF's own mirrored DSU frame, Tilt
+# Forward/Backward bound, and raw accel saturating at 6 degrees.
 #
-# Two routes were built and abandoned before the IMU Point path, and both look
-# correct on paper, so they are recorded:
-#
-#   * The raw accelerometer alone never reaches the camera. With IMUIR off,
-#     EmulateIMUCursor early-outs and nothing rotates the emulated IR camera,
-#     so the game sees a tilted accelerometer over a level sensor bar.
-#   * The Tilt group, bound to the DSU accelerometer, rotates the camera but is
-#     composed with the stick-driven pointer as Euler angles, so rolling the
-#     gun scrambled aim. Measured in the headset 2026-09-09.
-#
-# And one knob that is not free: IMUIR/Accelerometer Influence stays at
-# Dolphin's default (2%). Zero cannot ship, because Dolphin resets the IMU
+# One knob that is not free if IMU Point ever comes back:
+# IMUIR/Accelerometer Influence must stay above zero. Dolphin resets the IMU
 # orientation to identity whenever the gyro input is unbound and VRLF samples
 # a lane only while its gun is held, so every holster-and-regrab would leave a
-# roll offset that only the correction removes. The sway that knob was probed
-# for is answered in VRLF's DSU server (the linear gate) instead.
+# roll offset that only the correction removes.
 #
-# The full record is VRLF's docs/DECISIONS.md -> "Wii Remote rotation rides the
-# IMU Point path, from a roll-only orientation".
-EXTRAS = {
-    "DEADSPACE_P1": {
-        "IMUIR/Enabled": "True",
-        # Zero, so sweeping the gun cannot add to the stick's horizontal aim.
-        "IMUIR/Total Yaw": "0.",
-    },
-}
+# The full record is VRLF's docs/DECISIONS.md -> "Pointer roll rides Dolphin's
+# Tilt".
+EXTRAS = {}
 
 HEADER = """\
 # Generated for the VR Lightgun Framework (VRLF) - this file is MODIFIED.
