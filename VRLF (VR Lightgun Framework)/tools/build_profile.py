@@ -12,24 +12,23 @@ TRIO = ("IR/Total Yaw", "IR/Total Pitch", "IR/Vertical Offset")
 EXTENSION_KEYS = ("Extension", "Extension/Attach MotionPlus")
 CARRIED = TRIO + EXTENSION_KEYS
 
-# Per-game additions on top of the shared base, keyed by upstream stem.
+# Per-game additions on top of the shared base, keyed by upstream stem. The P2
+# transform below stops an entry from pointing player 2 at player 1's motion.
 #
-# Empty, and kept: a setting that should reach ONE game goes here rather than
-# into the base, and the P2 transform below is what stops such an entry from
-# pointing player 2 at player 1's motion. Tested with a synthetic entry.
+# Dead Space Extraction reads the remote's ROTATION for its alt fire, through
+# Dolphin's IMU Point path. That path needs VRLF's roll-only, mirrored
+# orientation (`dsu_orientation: {mode: roll_only, invert: true}`), which only
+# VRLF's "Dead Space Extraction (Dolphin)" profile sends. Every other game runs
+# on VRLF's "Dolphin" profile, which reports the gun's TRUE orientation so
+# motion games (Wii Sports) read real gravity and real swings. IMU Point on a
+# true orientation breaks aim two ways: nothing clamps its pitch, so the gun's
+# pitch lands on top of the stick aim, and it rotates the camera the opposite
+# way to a real roll. So the path is off in base/ and on here only.
 #
-# The IMU Point path lived here for one day (2026-09-09), scoped to Dead Space
-# Extraction because it reads the remote's ROTATION for its alt fire, on the
-# theory that a setting which rotates the remote must not reach games that
-# ignore roll. That theory was never tested and is mostly wrong: a real Wii
-# Remote reports its roll to every game as the angle between the two IR dots,
-# Dolphin applies the IMU rotation in the camera frame (about the optical
-# axis, exactly as a wrist twist rolls a real remote), and a game reading the
-# pointer through the SDK gets a roll-corrected position. So `IMUIR/Enabled`
-# and `IMUIR/Total Yaw = 0.` now sit in base/ and reach all 70 profiles; what
-# feeds them is VRLF's roll-only, mirrored orientation (`dsu_orientation:
-# {mode: roll_only, invert: true, linear_gate: 8.0}`), which VRLF applies to
-# every Wii controller and cannot scope per game anyway.
+# History: from 2026-09-09 to 2026-09-26 the path sat in base/ for all 70
+# profiles, fed by a roll lock on every VRLF Wii controller. That cost every
+# game truthful gravity, which broke motion titles. Split back out on
+# 2026-09-26.
 #
 # Two routes were built and abandoned before the IMU Point path, and both look
 # correct on paper, so they are recorded:
@@ -50,7 +49,13 @@ CARRIED = TRIO + EXTENSION_KEYS
 #
 # The full record is VRLF's docs/DECISIONS.md -> "Wii Remote rotation rides the
 # IMU Point path, from a roll-only orientation".
-EXTRAS = {}
+EXTRAS = {
+    "DEADSPACE_P1": {
+        "IMUIR/Enabled": "True",
+        # Zero, so sweeping the gun cannot add to the stick's horizontal aim.
+        "IMUIR/Total Yaw": "0.",
+    },
+}
 
 HEADER = """\
 # Generated for the VR Lightgun Framework (VRLF) - this file is MODIFIED.

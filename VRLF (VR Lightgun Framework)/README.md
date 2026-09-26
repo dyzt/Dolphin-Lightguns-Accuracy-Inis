@@ -47,10 +47,10 @@ servers on `127.0.0.1:26760` and `127.0.0.1:26761`. VRLF's
 ships both presets (`VRLF-Dolphin-Base` for player 1, `VRLF-Dolphin-Base-P2` for player 2)
 and lists the setup steps in its description.
 
-**This release needs VRLF 0.1.35 or later.** Every profile here enables Dolphin's IMU Point path
-and expects the roll-only orientation that build streams; on an earlier build the pointer takes
-the gun's pitch on top of the stick aim and the reticle rotates the wrong way. Older builds
-should stay on `vrlf-v1.0`.
+**Use VRLF's `Dolphin` profile for every game except Dead Space Extraction**, and VRLF's
+`Dead Space Extraction (Dolphin)` profile for that one. The main profile reports the gun's true
+motion, which motion games such as Wii Sports need; the Dead Space profile locks it to roll for
+the alt fire. See [Controller rotation](#controller-rotation).
 
 **USA game IDs only.** The pack was built against USA discs; a PAL or NTSC-J disc has a
 different game ID and simply gets no per-game profile, falling back to your global mapping.
@@ -75,9 +75,9 @@ different game ID and simply gets no per-game profile, falling back to your glob
   *"Selected controller profile does not exist"* at boot. They have no calibration to carry,
   so they get nothing here and fall back to your global mapping.
 
-- **Every profile reports the gun's roll.** All of them enable Dolphin's IMU Point path, so
-  turning the gun on its side rotates the emulated remote exactly as a real one would. Dead
-  Space Extraction reads it for its alt fire. See below.
+- **Dead Space Extraction also gets controller rotation.** Its profile pair is the only one that
+  enables Dolphin's IMU Point path, so turning the gun on its side reaches the game's alt fire.
+  See below.
 
 ## Controller rotation
 
@@ -88,7 +88,7 @@ accelerometer alone does not rotate the on-screen reticle: with `IMUIR/Enabled =
 Dolphin's `EmulateIMUCursor` early-outs, so nothing in the accelerometer path rotates the
 emulated IR camera.
 
-Dolphin's **IMU Point** path does rotate it, so every profile here enables it, from the base:
+Dolphin's **IMU Point** path does rotate it, so Dead Space's profile pair enables it:
 
 ```
 IMUIR/Enabled   = True
@@ -98,25 +98,20 @@ IMUIR/Total Yaw = 0.
 `Total Yaw` is zeroed so that sweeping the gun cannot add to the horizontal aim the stick is
 already driving. There is no equivalent clamp for pitch, and the rotation also enters Dolphin's
 camera transform un-negated where the Tilt group's angle enters negated. Both are answered on
-the VRLF side rather than here, by a profile field that makes the lane report a mirrored,
-roll-only orientation:
+the VRLF side, by a field that makes the lane report a mirrored, roll-only orientation:
 
 ```json
 "dsu_orientation": { "mode": "roll_only", "invert": true }
 ```
 
-That field exists from **VRLF 0.1.35**, which is why this whole release needs that build: on an
-earlier one the lane reports the gun's true orientation, so every pointer takes the gun's pitch
-on top of the stick aim and the reticle rotates the wrong way.
+Only VRLF's `Dead Space Extraction (Dolphin)` profile carries it. Played through the main
+`Dolphin` profile, this pair puts the gun's pitch on top of the stick aim and rotates the reticle
+the wrong way.
 
-**Why every game, not just Dead Space.** The first build scoped these two keys to Dead Space on
-the theory that a canted wrist would skew aim in a game that ignores roll. That was never tested
-and is mostly wrong: the IMU rotation is applied in the camera frame, about the optical axis,
-which is exactly what a real remote does when the wrist twists, and a game that reads the pointer
-through the SDK gets a roll-corrected position. A game reading the raw dots drifts with a canted
-wrist, and drifts the same way on a real Wii. What the universal setup costs, and a real remote
-does not: Dolphin's accelerometer correction sees a reload shake, so the reticle wobbles briefly
-while you shake. Measured acceptable in the headset on Dead Space before the fan-out.
+**Why only Dead Space.** From `vrlf-v1.1` every profile here enabled IMU Point, fed by a roll lock
+on every VRLF Wii controller. The lock costs the lane its truthful gravity, which broke games
+that read real motion (Wii Sports). So the main profile went back to true motion, IMU Point went
+back to one game, and the roll lock moved to a profile of its own.
 
 **Dolphin's Tilt group was tried first and does not work for this.** Tilt is summed with the
 stick-driven pointer as *Euler angles* (`GetRotationalMatrix(-tilt - swing - cursor)`), so roll
@@ -135,7 +130,7 @@ set behaves the same off screen.
 
 **Sway on fast moves is answered on the VRLF side.** Hand acceleration reaches Dolphin's
 accelerometer correction (`IMUIR/Accelerometer Influence`, left at its default of 2%) and used to
-add a little vertical movement on a fast sweep. VRLF 0.1.35 expresses that acceleration in the
+add a little vertical movement on a fast sweep. The Dead Space profile expresses that acceleration in the
 gun's own heading and gates it under the same field's `linear_gate` (m/s²), so a
 sweep never reaches the correction while a reload shake still does. Raise the number if sway is
 still visible, lower it if reload shakes stop registering. Do not zero the influence instead:
@@ -143,7 +138,7 @@ Dolphin restarts the IMU orientation from identity whenever the gyro input is un
 the correction every gun pickup would leave the reticle rotation offset for the rest of the session.
 
 To scope a setting to one game instead of the whole set, add it to `EXTRAS` in
-`tools/build_profile.py` and regenerate. The mechanism is kept and tested, and empty on purpose.
+`tools/build_profile.py` and regenerate. Dead Space's IMU Point keys live there.
 
 ## Which VRLF gun layout these assume
 
