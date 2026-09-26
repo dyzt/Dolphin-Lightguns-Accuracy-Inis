@@ -12,18 +12,32 @@ TRIO = ("IR/Total Yaw", "IR/Total Pitch", "IR/Vertical Offset")
 EXTENSION_KEYS = ("Extension", "Extension/Attach MotionPlus")
 CARRIED = TRIO + EXTENSION_KEYS
 
+# Holding the Nunchuk hand's stick click (pad Back, Wii Minus) for 1.5 s unplugs
+# the Nunchuk; holding it again plugs it back. Dolphin reads an attachment name
+# OR an input expression for `Extension` (Attachments::LoadConfig), valued as
+# the attachment index: 0 None, 1 Nunchuk. toggle() starts off, so `!` boots
+# attached. hold() keeps an ordinary click on Minus from unplugging anything,
+# though Dolphin cannot take back the Minus press a hold begins with.
+NUNCHUK_TOGGLE = "!toggle(hold(`Back`, 1.5))"
+
+
+def carried_value(key, value):
+    """What a carried pack value becomes in our profile."""
+    if key == "Extension" and value == "Nunchuk":
+        return NUNCHUK_TOGGLE
+    return value
+
 # Per-game additions on top of the shared base, keyed by upstream stem. The P2
 # transform below stops an entry from pointing player 2 at player 1's motion.
 #
 # Dead Space Extraction reads the remote's ROTATION for its alt fire, through
-# Dolphin's IMU Point path. That path needs VRLF's roll-only, mirrored
-# orientation (`dsu_orientation: {mode: roll_only, invert: true}`), which only
+# Dolphin's IMU Point path. That path needs VRLF's roll-only
+# orientation (`dsu_orientation: {mode: roll_only}`), which only
 # VRLF's "Dead Space Extraction (Dolphin)" profile sends. Every other game runs
 # on VRLF's "Dolphin" profile, which reports the gun's TRUE orientation so
 # motion games (Wii Sports) read real gravity and real swings. IMU Point on a
-# true orientation breaks aim two ways: nothing clamps its pitch, so the gun's
-# pitch lands on top of the stick aim, and it rotates the camera the opposite
-# way to a real roll. So the path is off in base/ and on here only.
+# true orientation breaks aim: nothing clamps its pitch, so the gun's pitch
+# lands on top of the stick aim. So the path is off in base/ and on here only.
 #
 # History: from 2026-09-09 to 2026-09-26 the path sat in base/ for all 70
 # profiles, fed by a roll lock on every VRLF Wii controller. That cost every
@@ -94,7 +108,7 @@ def build_profile(base_text, pack_text, source_stem, transform=None):
     # Extras override the base in place where the key already exists, so a base
     # that later grows its own Tilt/Angle cannot end up with two of them and let
     # Dolphin pick.
-    overrides = dict(calibration)
+    overrides = {key: carried_value(key, value) for key, value in calibration.items()}
     overrides.update(extras)
 
     out, seen = [], set()

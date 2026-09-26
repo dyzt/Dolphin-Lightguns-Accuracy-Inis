@@ -75,6 +75,11 @@ different game ID and simply gets no per-game profile, falling back to your glob
   *"Selected controller profile does not exist"* at boot. They have no calibration to carry,
   so they get nothing here and fall back to your global mapping.
 
+- **Unplug the Nunchuk from the headset.** Hold the Nunchuk hand's stick click for 1.5 s to
+  unplug it, and again to plug it back. Every profile and both base presets set `Extension` to
+  the input expression `` !toggle(hold(`Back`, 1.5)) `` instead of `Nunchuk`; a game boots with
+  it plugged in. A quick click is still Minus, and a hold presses Minus as it starts.
+
 - **Dead Space Extraction also gets controller rotation.** Its profile pair is the only one that
   enables Dolphin's IMU Point path, so turning the gun on its side reaches the game's alt fire.
   See below.
@@ -96,17 +101,15 @@ IMUIR/Total Yaw = 0.
 ```
 
 `Total Yaw` is zeroed so that sweeping the gun cannot add to the horizontal aim the stick is
-already driving. There is no equivalent clamp for pitch, and the rotation also enters Dolphin's
-camera transform un-negated where the Tilt group's angle enters negated. Both are answered on
-the VRLF side, by a field that makes the lane report a mirrored, roll-only orientation:
+already driving. There is no equivalent clamp for pitch, so it is answered on the VRLF side,
+by a field that makes the lane report a roll-only orientation:
 
 ```json
-"dsu_orientation": { "mode": "roll_only", "invert": true }
+"dsu_orientation": { "mode": "roll_only" }
 ```
 
 Only VRLF's `Dead Space Extraction (Dolphin)` profile carries it. Played through the main
-`Dolphin` profile, this pair puts the gun's pitch on top of the stick aim and rotates the reticle
-the wrong way.
+`Dolphin` profile, this pair puts the gun's pitch on top of the stick aim.
 
 **Why only Dead Space.** From `vrlf-v1.1` every profile here enabled IMU Point, fed by a roll lock
 on every VRLF Wii controller. The lock costs the lane its truthful gravity, which broke games

@@ -51,7 +51,7 @@ def check(pack_profiles, game_inis, out_profiles, out_games, base_p1, base_p2):
                         % (name, key, keys.get(key), value)
                     )
             for key, value in calibration.items():
-                if keys.get(key) != value:
+                if keys.get(key) != build_profile.carried_value(key, value):
                     problems.append(
                         "%s: calibration %s is %r, %s.ini says %r"
                         % (name, key, keys.get(key), stem, value)

@@ -100,6 +100,37 @@ class TestBuildProfile(unittest.TestCase):
             build_profile.build_profile(BASE, PACK_NO_CALIBRATION, "MDM_P1")
 
 
+class TestNunchukToggle(unittest.TestCase):
+    """Holding the Nunchuk hand's stick click unplugs the Nunchuk, and again
+    plugs it back. Dolphin takes an input expression where the attachment name
+    goes, valued as the attachment index (0 None, 1 Nunchuk)."""
+
+    def _keys(self, pack):
+        return inikit.parse_flat(build_profile.build_profile(BASE, pack, "SOMEGAME_P1"))
+
+    def test_a_pack_nunchuk_becomes_the_toggle(self):
+        keys = self._keys(PACK + "Extension = Nunchuk\n")
+        self.assertEqual(keys["Extension"], build_profile.NUNCHUK_TOGGLE)
+
+    def test_a_pack_that_wants_no_attachment_keeps_none(self):
+        self.assertEqual(self._keys(PACK + "Extension = None\n")["Extension"], "None")
+
+    def test_the_toggle_holds_the_stick_click_and_starts_attached(self):
+        # toggle() starts off, so ! reads 1 (Nunchuk) at boot; hold() keeps a
+        # plain click on Minus from unplugging anything.
+        self.assertEqual(build_profile.NUNCHUK_TOGGLE, "!toggle(hold(`Back`, 1.5))")
+
+    def test_the_toggle_names_no_dsu_slot_for_player_two_to_move(self):
+        self.assertEqual(derive_p2.derive_p2(build_profile.NUNCHUK_TOGGLE),
+                         build_profile.NUNCHUK_TOGGLE)
+
+    def test_every_base_carries_the_toggle(self):
+        # A game the pack does not cover uses the base (as the global mapping).
+        for name in SHIPPED_BASES:
+            keys = inikit.parse_flat(inikit.read_text(os.path.join(BASE_DIR, name)))
+            self.assertEqual(keys.get("Extension"), build_profile.NUNCHUK_TOGGLE, name)
+
+
 class TestShippedBases(unittest.TestCase):
     """The two templates every generated profile starts from."""
 
@@ -108,8 +139,8 @@ class TestShippedBases(unittest.TestCase):
 
     def test_the_imu_point_path_is_off_in_every_base(self):
         # VRLF's main Dolphin profile reports the gun's TRUE orientation, and
-        # IMU Point on that puts the gun's pitch on top of the stick aim and
-        # rolls the camera the wrong way. Only Dead Space turns it on.
+        # IMU Point on that puts the gun's pitch on top of the stick aim. Only
+        # Dead Space turns it on.
         for name in SHIPPED_BASES:
             keys = inikit.parse_flat(self._text(name))
             self.assertEqual(keys.get("IMUIR/Enabled"), "False", name)
